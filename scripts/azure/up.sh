@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Provision one Ubuntu VM (Docker preinstalled) with HTTP open for the demo.
+set -euo pipefail
+cd "$(dirname "$0")"
+source ./config.sh
+
+myip="$(curl -s https://api.ipify.org || echo '0.0.0.0')"
+
+az group create -n "$RG" -l "$LOCATION" 1>/dev/null
+
+az vm create \
+  -g "$RG" -n "$VM" \
+  --image Ubuntu2204 \
+  --size "$VM_SIZE" \
+  --admin-username "$ADMIN" \
+  --generate-ssh-keys \
+  --public-ip-sku Standard \
+  --custom-data @cloud-init.yaml 1>/dev/null
+
+# Web open for the demo; SSH restricted to the machine that ran this script.
+az vm open-port -g "$RG" -n "$VM" --port 80 --priority 900 1>/dev/null
+az network nsg rule create -g "$RG" --nsg-name "${VM}NSG" -n ssh-admin-only \
+  --priority 1000 --access Allow --protocol Tcp \
+  --destination-port-ranges 22 --source-address-prefixes "$myip/32" 1>/dev/null || true
+
+# Best-effort cost guardrail; ignored if the account lacks the permission.
+end="$(date -v+1y +%Y-%m-01 2>/dev/null || date -d '+1 year' +%Y-%m-01)"
+az consumption budget create --budget-name classledger-budget --amount 10 \
+  --category Cost --time-grain Monthly \
+  --start-date "$(date +%Y-%m-01)" --end-date "$end" 2>/dev/null \
+  || echo "note: budget not set (insufficient permission) — add one in the portal."
+
+ip="$(az vm show -d -g "$RG" -n "$VM" --query publicIps -o tsv)"
+echo "$ip" > .vm_ip
+echo "VM ready at $ip"
+echo "Next: ./deploy.sh   (wait ~1 min for Docker to finish installing)"

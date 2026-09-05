@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Espace enseignant</h1>
+
+<section class="card">
+  <h2>Inscrire un étudiant</h2>
+  <form method="post" action="/enroll" class="row">
+    <input name="address" placeholder="0x… adresse de l'étudiant" required>
+    <button>Inscrire</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Déposer un document</h2>
+  <form method="post" action="/material" enctype="multipart/form-data" class="grid">
+    <label>Type
+      <select name="kind">
+        {% for value, name in kinds %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Titre <input name="title" required></label>
+    <label>Date d'examen <input type="datetime-local" name="exam_at"></label>
+    <label>Révise le document n° <input name="prev_id" placeholder="optionnel, ex. 0"></label>
+    <label>Fichier <input type="file" name="file" required></label>
+    <button>Publier sur la blockchain</button>
+  </form>
+  <p class="muted">Examen et correction ne deviennent visibles que 24 h après la date d'examen.</p>
+</section>
+
+<section class="card">
+  <h2>Documents publiés</h2>
+  <table>
+    <tr><th>#</th><th>Type</th><th>Titre</th><th>Version</th><th>Accès</th><th></th></tr>
+    {% for m in materials %}
+    <tr>
+      <td>{{ m.id }}</td><td>{{ m.kind }}</td><td>{{ m.title }}</td>
+      <td>{% if m.has_prev %}révise #{{ m.prev_id }}{% else %}—{% endif %}</td>
+      <td>{% if m.accessible %}ouvert{% else %}verrouillé{% endif %}</td>
+      <td><a href="/material/{{ m.id }}/download">Télécharger</a></td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+
+<section class="card">
+  <h2>Notes</h2>
+  <form method="post" action="/grade" class="row">
+    <input name="address" placeholder="0x… adresse de l'étudiant" required>
+    <input name="value" placeholder="ex. A ou 16/20" required>
+    <button>Publier la note</button>
+  </form>
+  <table>
+    <tr><th>Étudiant</th><th>Note</th></tr>
+    {% for s in students %}
+    <tr><td class="mono">{{ s.address }}</td><td>{% if s.published %}{{ s.grade }}{% else %}—{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

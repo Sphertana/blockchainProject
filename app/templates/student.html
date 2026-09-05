@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Espace étudiant</h1>
+{% if not enrolled %}
+  <p class="muted">Vous n'êtes pas encore inscrit dans cette classe.</p>
+{% else %}
+<section class="card">
+  <h2>Ma note</h2>
+  <p>{% if published %}<strong>{{ grade }}</strong>{% else %}Pas encore publiée.{% endif %}</p>
+</section>
+<section class="card">
+  <h2>Documents</h2>
+  <table>
+    <tr><th>#</th><th>Type</th><th>Titre</th><th>Accès</th><th></th></tr>
+    {% for m in materials %}
+    <tr>
+      <td>{{ m.id }}</td><td>{{ m.kind }}</td><td>{{ m.title }}</td>
+      <td>{% if m.accessible %}ouvert{% else %}verrouillé (24 h){% endif %}</td>
+      <td>{% if m.accessible %}<a href="/material/{{ m.id }}/download">Télécharger</a>{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endif %}
+{% endblock %}

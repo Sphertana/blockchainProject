@@ -1,0 +1,65 @@
+:root {
+  --bg: #f4f6fb;
+  --card: #ffffff;
+  --ink: #1c2430;
+  --muted: #6b7688;
+  --accent: #2d5bd7;
+  --line: #dde3ee;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+}
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  padding: .8rem 1.2rem;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+.brand { font-weight: 700; color: var(--ink); text-decoration: none; }
+nav { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+nav a { color: var(--accent); text-decoration: none; }
+.who { color: var(--muted); font-size: .9rem; }
+main { max-width: 900px; margin: 1.5rem auto; padding: 0 1rem; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.1rem; margin-top: 0; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 1rem 1.2rem;
+  margin: 1rem 0;
+}
+label { display: block; margin: .5rem 0; font-size: .92rem; }
+input, select, button {
+  font: inherit;
+  padding: .5rem .6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-top: .2rem;
+}
+input, select { width: 100%; }
+.row { display: flex; gap: .6rem; flex-wrap: wrap; align-items: end; }
+.row input { flex: 1; min-width: 220px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .6rem; }
+button, .btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+button:hover, .btn:hover { opacity: .9; }
+table { width: 100%; border-collapse: collapse; margin-top: .6rem; }
+th, td { text-align: left; padding: .5rem .4rem; border-bottom: 1px solid var(--line); font-size: .92rem; }
+.muted { color: var(--muted); }
+.error { color: #b3261e; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; word-break: break-all; }

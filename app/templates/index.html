@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Description de la classe</h1>
+{% if deployed %}
+  <div class="card">
+    <p><strong>Description :</strong> {{ description }}</p>
+    <p><strong>Organisation :</strong> {{ organization }}</p>
+  </div>
+  <p class="muted">Ces informations sont publiques et lues directement sur la blockchain.</p>
+{% else %}
+  <p class="muted">Le registre n'est pas encore déployé sur la blockchain.</p>
+{% endif %}
+{% if not user %}<p><a class="btn" href="/login">Connexion</a></p>{% endif %}
+{% endblock %}

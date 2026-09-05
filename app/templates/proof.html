@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Preuve blockchain</h1>
+<table class="card">
+  <tr><th>Connecté au nœud</th><td>{{ info.connected }}</td></tr>
+  <tr><th>Chain ID</th><td>{{ info.chain_id }}</td></tr>
+  <tr><th>Dernier bloc</th><td>{{ info.block }}</td></tr>
+  <tr><th>Pairs connectés</th><td>{{ info.peers }}</td></tr>
+  <tr><th>Validateurs QBFT</th><td>{{ info.validators|length }}</td></tr>
+  <tr><th>Adresse du contrat</th><td class="mono">{{ info.address }}</td></tr>
+</table>
+{% if info.validators %}
+<h2>Validateurs</h2>
+<ul class="mono">{% for v in info.validators %}<li>{{ v }}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

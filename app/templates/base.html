@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Registre de classe · blockchain{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+  <header>
+    <a class="brand" href="/">Registre de classe · blockchain</a>
+    <nav>
+      {% if user %}
+        <span class="who">{{ user.username }} · {{ user.role }}</span>
+        <a href="/dashboard">Tableau de bord</a>
+        <a href="/proof">Preuve</a>
+        <a href="/logout">Déconnexion</a>
+      {% else %}
+        <a href="/">Accueil</a>
+        <a href="/login">Connexion</a>
+      {% endif %}
+    </nav>
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

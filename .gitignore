@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Secrets / local env
+.env
+*.pem
+
+# Local runtime data (SQLite DB, uploaded course files)
+data/
+
+# Besu-generated material (node keys, genesis, chain data) — never commit keys
+network/data/
+network/networkFiles/
+
+# solcx compiler downloads
+.solcx/
+
+# OS
+.DS_Store
+
+# Local project skill: guides local work, intentionally not part of the public repo
+.github/skills/
