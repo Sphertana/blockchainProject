@@ -9,16 +9,23 @@ COMPOSE="docker compose -f network/docker-compose.yml"
 tmp="$(mktemp -d)"
 jarT="$tmp/teacher.txt"
 jarS="$tmp/student.txt"
+jarS2="$tmp/student2.txt"
 
 pass() { printf "  ok: %s\n" "$1"; }
 fail() { printf "  FAIL: %s\n" "$1"; exit 1; }
 
 echo "== chain =="
 $COMPOSE exec -T api python - <<'PY'
-from app.chain import get_w3, contract_address
+import time
+
+from app.chain import get_w3, contract_address, wait_for_rpc
 w3 = get_w3()
-assert w3.is_connected(), "RPC down"
-peers = int(w3.net.peer_count)
+assert wait_for_rpc(w3, tries=60, delay=2), "RPC down"
+for _ in range(60):
+    peers = int(w3.net.peer_count)
+    if peers == 3:
+        break
+    time.sleep(2)
 print("  peers:", peers)
 assert peers == 3, f"expected 3 peers, got {peers}"
 assert contract_address(), "contract not deployed (run make deploy)"
@@ -63,10 +70,25 @@ pass "exam locked for 24h"
 echo "$html" | grep -q "<strong>A</strong>" || fail "student cannot see own grade"
 pass "student sees own grade"
 
+echo "== student2 cannot see student1's grade =="
+curl -s -o /dev/null -c "$jarS2" -d 'username=student2&password=student2' "$BASE/login"
+html2="$(curl -s -b "$jarS2" "$BASE/dashboard")"
+echo "$html2" | grep -q "<strong>A</strong>" && fail "student2 can see student1's grade"
+pass "student2 cannot see student1's grade"
+
 echo "== hash-verified download of the lecture =="
 curl -s -b "$jarS" "$BASE/material/$lecture_id/download" -o "$tmp/dl.txt"
 diff -q "$tmp/lecture.txt" "$tmp/dl.txt" >/dev/null || fail "downloaded file differs"
 pass "download matches original (SHA-256 verified on-chain)"
+
+echo "== tampered file is rejected =="
+ref="$($COMPOSE exec -T api python -c "from app.chain import get_w3,get_contract,teacher_account;w=get_w3();c=get_contract(w);print(c.functions.getFile($lecture_id).call({'from':teacher_account(w).address})[0])" | tr -d '\r')"
+cp "data/files/$ref" "$tmp/original.txt"
+printf 'tampered' >> "data/files/$ref"
+tamper_response="$(curl -s -b "$jarS" "$BASE/material/$lecture_id/download")"
+cp "$tmp/original.txt" "data/files/$ref"
+echo "$tamper_response" | grep -qi "compromise" || fail "tampered file was not rejected"
+pass "tampered file rejected by on-chain SHA-256 check"
 
 echo "== locked exam cannot be downloaded =="
 curl -s -b "$jarS" "$BASE/material/$exam_id/download" | grep -qi "refus" || fail "locked exam was downloadable"

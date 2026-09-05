@@ -1,7 +1,7 @@
 name: classledger
 
 x-besu: &besu
-  image: ${BESU_IMAGE:-hyperledger/besu:24.12.0}
+  image: ${BESU_IMAGE:-hyperledger/besu:26.2.0}
   restart: unless-stopped
   entrypoint: ["besu"]
   command:
@@ -77,7 +77,15 @@ services:
       context: ..
       dockerfile: Dockerfile
     container_name: classledger-api
-    depends_on: [validator1, validator2, validator3, validator4]
+    depends_on:
+      validator1:
+        condition: service_healthy
+      validator2:
+        condition: service_healthy
+      validator3:
+        condition: service_healthy
+      validator4:
+        condition: service_healthy
     env_file: ../.env
     environment:
       - RPC_URL=http://validator1:8545
@@ -85,6 +93,15 @@ services:
       - ../data:/app/data
     ports:
       - "${WEB_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,urllib.request; data=json.load(urllib.request.urlopen('http://localhost:8000/health', timeout=2)); assert data['rpc']"
+      interval: 3s
+      timeout: 3s
+      retries: 40
     networks:
       - besu
 

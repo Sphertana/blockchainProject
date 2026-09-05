@@ -4,6 +4,7 @@ import os
 
 from web3 import Web3
 
+from app import files
 from app.chain import get_contract, get_w3, send_as_teacher, wait_for_rpc
 
 
@@ -20,11 +21,20 @@ def main() -> None:
             send_as_teacher(w3, c.functions.enroll(addr))
             print("enrolled", addr)
 
-    send_as_teacher(
-        w3,
-        c.functions.addMaterial(0, "Welcome lecture", "seed-ref", b"\x00" * 32, 0, False, 0),
-    )
-    print("added sample lecture; materials:", c.functions.materialCount().call())
+    if c.functions.materialCount().call() == 0:
+        content = b"Welcome to Blockchain 101.\n"
+        ref, digest = files.save(content, "welcome.txt")
+        try:
+            send_as_teacher(
+                w3, c.functions.addMaterial(0, "Welcome lecture", ref, digest, 0, False, 0)
+            )
+        except Exception:
+            files.delete(ref)
+            raise
+        print("added sample lecture")
+    else:
+        print("sample material already present")
+    print("materials:", c.functions.materialCount().call())
 
 
 if __name__ == "__main__":

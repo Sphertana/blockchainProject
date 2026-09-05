@@ -6,7 +6,9 @@ and turns contract reverts into friendly messages.
 """
 
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -20,16 +22,19 @@ from app.chain import contract_address, get_contract, get_w3, send_as_teacher
 
 KIND_NAMES = ["Cours", "TP", "Examen", "Correction"]
 MAX_UPLOAD = 10 * 1024 * 1024  # 10 MB is plenty for a demo document
+CLASS_TIMEZONE = ZoneInfo(os.environ.get("CLASS_TIMEZONE", "Europe/Paris"))
 
-app = FastAPI(title="Registre de classe — blockchain")
+
+@asynccontextmanager
+async def lifespan(application: FastAPI):
+    auth.init_db()
+    yield
+
+
+app = FastAPI(title="Registre de classe — blockchain", lifespan=lifespan)
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SESSION_SECRET", "dev"), same_site="lax")
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
-
-
-@app.on_event("startup")
-def _startup() -> None:
-    auth.init_db()
 
 
 def current_user(request: Request) -> dict | None:
@@ -74,11 +79,12 @@ def index(request: Request):
     description = organization = None
     deployed = False
     try:
-        c = get_contract(get_w3())
+        w3 = get_w3()
+        c = get_contract(w3)
         if c is not None:
-            deployed = True
             description = c.functions.classDescription().call()
             organization = c.functions.classOrganization().call()
+            deployed = True
     except Exception:
         pass
     return render(
@@ -94,7 +100,14 @@ def index(request: Request):
 @app.get("/health")
 def health():
     try:
-        return {"rpc": get_w3().is_connected(), "contract": contract_address()}
+        w3 = get_w3()
+        address = contract_address()
+        deployed = bool(
+            address
+            and w3.is_connected()
+            and w3.eth.get_code(Web3.to_checksum_address(address))
+        )
+        return {"rpc": w3.is_connected(), "contract": address if deployed else None}
     except Exception:
         return {"rpc": False, "contract": None}
 
@@ -196,10 +209,17 @@ async def add_material(
     data = await file.read()
     if len(data) > MAX_UPLOAD:
         return render(request, "error.html", user=user, message="Fichier trop volumineux (max 10 Mo).")
-    ref, digest = files.save(data, file.filename)
-    exam_ts = int(datetime.fromisoformat(exam_at).timestamp()) if exam_at else 0
-    has_prev = prev_id.strip() != ""
-    pid = int(prev_id) if has_prev else 0
+    try:
+        exam_ts = (
+            int(datetime.fromisoformat(exam_at).replace(tzinfo=CLASS_TIMEZONE).timestamp())
+            if exam_at
+            else 0
+        )
+        has_prev = prev_id.strip() != ""
+        pid = int(prev_id) if has_prev else 0
+    except ValueError:
+        return render(request, "error.html", user=user, message="Date ou numéro de version invalide.")
+    ref, digest = files.save(data, file.filename or "document")
     w3 = get_w3()
     c = get_contract(w3)
     try:

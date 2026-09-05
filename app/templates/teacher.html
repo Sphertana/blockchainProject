@@ -6,7 +6,7 @@
   <h2>Inscrire un étudiant</h2>
   <form method="post" action="/enroll" class="row">
     <input name="address" placeholder="0x… adresse de l'étudiant" required>
-    <button>Inscrire</button>
+    <button type="submit">Inscrire</button>
   </form>
 </section>
 
@@ -22,7 +22,7 @@
     <label>Date d'examen <input type="datetime-local" name="exam_at"></label>
     <label>Révise le document n° <input name="prev_id" placeholder="optionnel, ex. 0"></label>
     <label>Fichier <input type="file" name="file" required></label>
-    <button>Publier sur la blockchain</button>
+    <button type="submit">Publier sur la blockchain</button>
   </form>
   <p class="muted">Examen et correction ne deviennent visibles que 24 h après la date d'examen.</p>
 </section>
@@ -47,7 +47,7 @@
   <form method="post" action="/grade" class="row">
     <input name="address" placeholder="0x… adresse de l'étudiant" required>
     <input name="value" placeholder="ex. A ou 16/20" required>
-    <button>Publier la note</button>
+    <button type="submit">Publier la note</button>
   </form>
   <table>
     <tr><th>Étudiant</th><th>Note</th></tr>

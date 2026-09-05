@@ -2,13 +2,25 @@
 
 import os
 
-from app.chain import ARTIFACT, get_w3, save_address, teacher_account, wait_for_rpc
+from web3 import Web3
+
+from app.chain import ARTIFACT, contract_address, get_w3, save_address, teacher_account, wait_for_rpc
 
 
 def main() -> None:
     w3 = get_w3()
     if not wait_for_rpc(w3):
         raise SystemExit("blockchain RPC not reachable")
+
+    existing = contract_address()
+    if existing:
+        try:
+            if w3.eth.get_code(Web3.to_checksum_address(existing)):
+                print("ClassLedger already deployed at", existing)
+                return
+        except ValueError:
+            pass
+
     acct = teacher_account(w3)
     factory = w3.eth.contract(abi=ARTIFACT["abi"], bytecode=ARTIFACT["bytecode"])
     description = os.environ.get("CLASS_DESCRIPTION", "Blockchain 101 — distributed ledgers")
@@ -24,6 +36,10 @@ def main() -> None:
     )
     signed = acct.sign_transaction(tx)
     receipt = w3.eth.wait_for_transaction_receipt(w3.eth.send_raw_transaction(signed.raw_transaction))
+    if receipt.status != 1 or not receipt.contractAddress:
+        raise SystemExit("ClassLedger deployment reverted")
+    if not w3.eth.get_code(receipt.contractAddress):
+        raise SystemExit("ClassLedger deployment produced no contract code")
     save_address(receipt.contractAddress)
     print("ClassLedger deployed at", receipt.contractAddress)
 

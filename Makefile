@@ -20,7 +20,7 @@ genkeys:
 up:
 	@test -f .env || cp .env.example .env
 	@test -f network/data/genesis.json || ./scripts/network/generate.sh
-	$(COMPOSE) up -d --build
+	$(COMPOSE) up -d --build --wait --wait-timeout 180
 
 down:
 	$(COMPOSE) down
@@ -35,7 +35,7 @@ smoke:
 	./scripts/smoke.sh
 
 test:
-	$(COMPOSE) run --rm --no-deps --build api pytest
+	$(COMPOSE) run --rm --no-deps --build api python -m pytest
 
 compile:
 	python3 scripts/compile.py

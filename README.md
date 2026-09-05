@@ -73,7 +73,7 @@ make clean     # stop and delete generated keys + chain data
 ## Tests
 
 ```bash
-make test      # 6 contract-rule tests on an in-process EVM (fast, no Besu needed)
+make test      # 7 rule/integrity tests on an in-process EVM (fast, no Besu needed)
 make smoke     # end-to-end on the running stack (needs make up + make deploy)
 ```
 
@@ -93,6 +93,11 @@ scripts/azure/deploy.sh   # copy the repo, start, deploy, seed
 scripts/azure/stop.sh     # deallocate the VM (stops compute billing)
 scripts/azure/destroy.sh  # delete everything
 ```
+
+The first deploy generates random web passwords and saves them locally in
+`scripts/azure/.demo_credentials` (git-ignored). Add an email threshold to the
+created `classledger-budget` in Azure Cost Management. HTTP is intentionally
+limited to this short-lived demo; do not use real student data or passwords.
 
 The four validators run as four containers on this single VM — cost-effective for
 a demo, not a production topology (which would spread them across hosts/orgs).
