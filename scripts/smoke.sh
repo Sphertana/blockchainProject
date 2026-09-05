@@ -34,6 +34,9 @@ PY
 pass "4-validator QBFT network, contract deployed"
 
 STUDENT1="$($COMPOSE exec -T api python -c "import os;print(os.environ['STUDENT1_ADDRESS'])" | tr -d '\r')"
+TEACHER_PASSWORD="$($COMPOSE exec -T api python -c "import os;print(os.environ['TEACHER_PASSWORD'])" | tr -d '\r')"
+STUDENT1_PASSWORD="$($COMPOSE exec -T api python -c "import os;print(os.environ['STUDENT1_PASSWORD'])" | tr -d '\r')"
+STUDENT2_PASSWORD="$($COMPOSE exec -T api python -c "import os;print(os.environ['STUDENT2_PASSWORD'])" | tr -d '\r')"
 
 echo "== ensure student1 enrolled =="
 $COMPOSE exec -T api python - <<PY
@@ -47,7 +50,7 @@ print("  enrolled:", c.functions.isEnrolled(addr).call())
 PY
 
 echo "== teacher logs in and publishes a lecture + a locked exam =="
-curl -s -o /dev/null -c "$jarT" -d 'username=teacher&password=teacher' "$BASE/login"
+curl -s -o /dev/null -c "$jarT" -d 'username=teacher' --data-urlencode "password=$TEACHER_PASSWORD" "$BASE/login"
 echo "smoke lecture $(date)" > "$tmp/lecture.txt"
 curl -s -o /dev/null -b "$jarT" -F 'kind=0' -F 'title=Cours smoke' -F "file=@$tmp/lecture.txt" "$BASE/material"
 now="$(date +%Y-%m-%dT%H:%M)"
@@ -61,7 +64,7 @@ echo "== teacher publishes a grade for student1 =="
 curl -s -o /dev/null -b "$jarT" -d "address=$STUDENT1&value=A" "$BASE/grade"
 
 echo "== student1 dashboard reflects the rules =="
-curl -s -o /dev/null -c "$jarS" -d 'username=student1&password=student1' "$BASE/login"
+curl -s -o /dev/null -c "$jarS" -d 'username=student1' --data-urlencode "password=$STUDENT1_PASSWORD" "$BASE/login"
 html="$(curl -s -b "$jarS" "$BASE/dashboard")"
 echo "$html" | grep -q "Cours smoke" || fail "student cannot see the lecture"
 pass "lecture visible to enrolled student"
@@ -71,7 +74,7 @@ echo "$html" | grep -q "<strong>A</strong>" || fail "student cannot see own grad
 pass "student sees own grade"
 
 echo "== student2 cannot see student1's grade =="
-curl -s -o /dev/null -c "$jarS2" -d 'username=student2&password=student2' "$BASE/login"
+curl -s -o /dev/null -c "$jarS2" -d 'username=student2' --data-urlencode "password=$STUDENT2_PASSWORD" "$BASE/login"
 html2="$(curl -s -b "$jarS2" "$BASE/dashboard")"
 echo "$html2" | grep -q "<strong>A</strong>" && fail "student2 can see student1's grade"
 pass "student2 cannot see student1's grade"

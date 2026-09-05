@@ -28,6 +28,7 @@ make up
 curl -fsS http://localhost/health >/dev/null
 make deploy
 make seed
+BASE=http://localhost make smoke
 REMOTE
 
 ssh "$ADMIN@$ip" "cd ~/classledger && grep -E '^(TEACHER|STUDENT1|STUDENT2)_PASSWORD=' .env" \
