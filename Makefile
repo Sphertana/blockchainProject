@@ -1,4 +1,4 @@
-COMPOSE = docker compose -f network/docker-compose.yml
+COMPOSE = docker compose --env-file .env -f network/docker-compose.yml
 
 .PHONY: help genkeys up down deploy seed smoke test compile logs ps clean
 

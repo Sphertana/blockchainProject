@@ -102,6 +102,10 @@ limited to this short-lived demo; do not use real student data or passwords.
 The four validators run as four containers on this single VM — cost-effective for
 a demo, not a production topology (which would spread them across hosts/orgs).
 
+The Azure workflow was validated end to end on 6 September 2026: public login,
+all access-rule smoke checks, one-validator QBFT tolerance, private RPC/P2P ports,
+and persistence after a full Compose restart.
+
 ## Configuration
 
 Copy `.env.example` to `.env` (done automatically by `make up`). Keys there are

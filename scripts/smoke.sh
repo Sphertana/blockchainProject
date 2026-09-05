@@ -86,10 +86,23 @@ pass "download matches original (SHA-256 verified on-chain)"
 
 echo "== tampered file is rejected =="
 ref="$($COMPOSE exec -T api python -c "from app.chain import get_w3,get_contract,teacher_account;w=get_w3();c=get_contract(w);print(c.functions.getFile($lecture_id).call({'from':teacher_account(w).address})[0])" | tr -d '\r')"
-cp "data/files/$ref" "$tmp/original.txt"
-printf 'tampered' >> "data/files/$ref"
+$COMPOSE exec -T -e FILE_REF="$ref" api python - <<'PY'
+import os
+from pathlib import Path
+
+path = Path("data/files") / os.environ["FILE_REF"]
+Path("/tmp/smoke-original").write_bytes(path.read_bytes())
+with path.open("ab") as stream:
+    stream.write(b"tampered")
+PY
 tamper_response="$(curl -s -b "$jarS" "$BASE/material/$lecture_id/download")"
-cp "$tmp/original.txt" "data/files/$ref"
+$COMPOSE exec -T -e FILE_REF="$ref" api python - <<'PY'
+import os
+from pathlib import Path
+
+path = Path("data/files") / os.environ["FILE_REF"]
+path.write_bytes(Path("/tmp/smoke-original").read_bytes())
+PY
 echo "$tamper_response" | grep -qi "compromise" || fail "tampered file was not rejected"
 pass "tampered file rejected by on-chain SHA-256 check"
 
