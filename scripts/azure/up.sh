@@ -49,5 +49,5 @@ az rest --method put \
 ip="$(az vm show -d -g "$RG" -n "$VM" --query publicIps -o tsv)"
 echo "$ip" > .vm_ip
 echo "VM ready at $ip"
-echo "Budget 'classledger-budget': 10 USD/month, email alert at 80%."
+echo "Budget 'classledger-budget': 10 billing-currency units/month, email alert at 80%."
 echo "Next: ./deploy.sh   (wait ~1 min for Docker to finish installing)"
