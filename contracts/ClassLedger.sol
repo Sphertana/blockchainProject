@@ -5,6 +5,8 @@ pragma solidity ^0.8.20;
 /// All access rules of the assignment are enforced here; the web app only mirrors them.
 /// Reads are gated on msg.sender, which the gateway sets via `eth_call { from }`.
 contract ClassLedger {
+    uint256 public constant CONTRACT_VERSION = 4;
+
     enum Kind {
         LECTURE,
         LAB,
@@ -35,8 +37,12 @@ contract ClassLedger {
     uint64 public constant EXAM_DELAY = 24 hours;
 
     address public teacher;
-    string public classDescription; // public
-    string public classOrganization; // public
+    struct ClassInfo {
+        string description;
+        string organization;
+    }
+
+    ClassInfo[] private classInfoVersions;
 
     Material[] private materials;
 
@@ -45,8 +51,7 @@ contract ClassLedger {
     address[] private applicants; // every address that ever applied, in order
     address[] private students; // approved only
 
-    mapping(address => bool) private gradePublished;
-    mapping(address => string) private grade; // readable only by its owner or the teacher
+    mapping(address => string[]) private gradeVersions;
 
     event EnrollmentRequested(address indexed student, uint64 at);
     event Enrolled(address indexed student);
@@ -61,8 +66,7 @@ contract ClassLedger {
 
     constructor(string memory description, string memory organization) {
         teacher = msg.sender;
-        classDescription = description;
-        classOrganization = organization;
+        classInfoVersions.push(ClassInfo(description, organization));
     }
 
     // --- enrollment: the student applies, the teacher decides ---
@@ -131,8 +135,24 @@ contract ClassLedger {
     // --- teacher-only writes ---
 
     function setClassInfo(string calldata description, string calldata organization) external onlyTeacher {
-        classDescription = description;
-        classOrganization = organization;
+        classInfoVersions.push(ClassInfo(description, organization));
+    }
+
+    function classDescription() external view returns (string memory) {
+        return classInfoVersions[classInfoVersions.length - 1].description;
+    }
+
+    function classOrganization() external view returns (string memory) {
+        return classInfoVersions[classInfoVersions.length - 1].organization;
+    }
+
+    function classInfoVersionCount() external view returns (uint256) {
+        return classInfoVersions.length;
+    }
+
+    function classInfoAt(uint256 version) external view returns (string memory, string memory) {
+        ClassInfo storage info = classInfoVersions[version];
+        return (info.description, info.organization);
     }
 
     function addMaterial(
@@ -147,8 +167,17 @@ contract ClassLedger {
         if (kind == Kind.EXAM || kind == Kind.CORRECTION) {
             require(examAt > 0, "examAt required");
         }
+        if (kind == Kind.CORRECTION) {
+            require(hasPrev, "correction must link previous");
+        }
         if (hasPrev) {
             require(prevId < materials.length, "bad prevId");
+        }
+        if (kind == Kind.CORRECTION) {
+            // The 24h lock of a correction follows the exam it corrects.
+            Material storage prev = materials[prevId];
+            require(prev.kind == Kind.EXAM || prev.kind == Kind.CORRECTION, "prev must be an exam");
+            require(examAt == prev.examAt, "examAt must match exam");
         }
         materials.push(
             Material({
@@ -168,8 +197,7 @@ contract ClassLedger {
 
     function publishGrade(address student, string calldata value) external onlyTeacher {
         require(isEnrolled(student), "not enrolled");
-        grade[student] = value;
-        gradePublished[student] = true;
+        gradeVersions[student].push(value);
         emit GradePublished(student);
     }
 
@@ -223,12 +251,27 @@ contract ClassLedger {
     }
 
     function myGrade() external view returns (bool published, string memory value) {
-        return (gradePublished[msg.sender], gradePublished[msg.sender] ? grade[msg.sender] : "");
+        return _latestGrade(msg.sender);
     }
 
     function gradeOf(address student) external view returns (bool published, string memory value) {
         require(msg.sender == teacher || msg.sender == student, "forbidden");
-        return (gradePublished[student], gradePublished[student] ? grade[student] : "");
+        return _latestGrade(student);
+    }
+
+    function _latestGrade(address student) private view returns (bool, string memory) {
+        uint256 count = gradeVersions[student].length;
+        return (count > 0, count > 0 ? gradeVersions[student][count - 1] : "");
+    }
+
+    function gradeVersionCount(address student) external view returns (uint256) {
+        require(msg.sender == teacher || msg.sender == student, "forbidden");
+        return gradeVersions[student].length;
+    }
+
+    function gradeAt(address student, uint256 version) external view returns (string memory) {
+        require(msg.sender == teacher || msg.sender == student, "forbidden");
+        return gradeVersions[student][version];
     }
 
     function studentCount() external view returns (uint256) {

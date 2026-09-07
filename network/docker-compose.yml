@@ -73,6 +73,7 @@ services:
         ipv4_address: 172.28.0.14
 
   api:
+    restart: unless-stopped
     build:
       context: ..
       dockerfile: Dockerfile

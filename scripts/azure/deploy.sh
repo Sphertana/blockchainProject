@@ -21,6 +21,8 @@ az network nsg rule create -g "$RG" --nsg-name "${nsg_id##*/}" -n https-demo \
 # Push code only — never local secrets, keys, or chain data.
 rsync -az --delete \
   --exclude '.git' --exclude '.venv' --exclude '.env' --exclude '.github/skills' \
+  --exclude 'EXPLICATIONS_PERSO.md' --exclude 'scripts/azure/.demo_credentials' \
+  --exclude 'scripts/azure/.vm_ip' --exclude 'scripts/azure/.vm_host' \
   --exclude 'data' \
   --exclude 'network/data' --exclude 'network/networkFiles' \
   ./ "$ADMIN@$ip:~/classledger/"
@@ -50,8 +52,10 @@ set_value() {
 }
 ensure_secret SESSION_SECRET
 ensure_secret WALLET_SECRET
-grep -q '^GRADE_ENCRYPTION_KEY=' .env \
-  || echo "GRADE_ENCRYPTION_KEY=$(openssl rand -hex 32)" >> .env
+grade_key="$(sed -n 's/^GRADE_ENCRYPTION_KEY=//p' .env)"
+if [[ ! "$grade_key" =~ ^[0-9a-fA-F]{64}$ || "$grade_key" == "${grade_key//?/0}" ]]; then
+  set_value GRADE_ENCRYPTION_KEY "$(openssl rand -hex 32)"
+fi
 for name in CLASS_TIMEZONE RPC_URL TEACHER_ADDRESS TEACHER_PRIVATE_KEY \
   STUDENT1_ADDRESS STUDENT1_PRIVATE_KEY STUDENT2_ADDRESS STUDENT2_PRIVATE_KEY; do
   grep -q "^${name}=" .env || grep "^${name}=" .env.example >> .env
@@ -63,6 +67,7 @@ set_value WEB_BIND 127.0.0.1
 set_value WEB_PORT 8000
 set_value COMPOSE_PROFILES azure
 set_value PUBLIC_HOST "$PUBLIC_HOST"
+chmod 600 .env
 
 make up
 for _ in $(seq 1 24); do
@@ -75,8 +80,9 @@ make seed
 BASE="https://$PUBLIC_HOST" make smoke
 REMOTE
 
+umask 077
 ssh "$ADMIN@$ip" "cd ~/classledger && grep -E '^(TEACHER|STUDENT1|STUDENT2)_PASSWORD=' .env" \
-  | tee scripts/azure/.demo_credentials
+  > scripts/azure/.demo_credentials
 chmod 600 scripts/azure/.demo_credentials
 echo "Deployed — open https://$host/"
 echo "Demo credentials saved locally in scripts/azure/.demo_credentials (git-ignored)."

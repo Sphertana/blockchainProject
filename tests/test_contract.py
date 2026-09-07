@@ -48,6 +48,7 @@ def add(c, teacher, kind, title, exam_at=0, has_prev=False, prev_id=0):
 # Rule: description & organization are public.
 def test_class_info_is_public(env):
     _, c, _, _, _, outsider = env
+    assert c.functions.CONTRACT_VERSION().call() == 4
     assert c.functions.classDescription().call({"from": outsider}) == "Blockchain 101"
     assert c.functions.classOrganization().call({"from": outsider}) == "ISEP, fall 2026"
 
@@ -153,6 +154,26 @@ def test_correction_locked_for_24h(env):
     assert c.functions.canAccess(1).call({"from": alice}) is True
 
 
+def test_correction_must_link_to_previous_material(env):
+    w3, c, teacher, _, _, _ = env
+    exam_at = w3.eth.get_block("latest")["timestamp"]
+    with pytest.raises(REVERT):
+        add(c, teacher, CORRECTION, "Orphan correction", exam_at=exam_at)
+
+
+def test_correction_inherits_the_exam_date(env):
+    w3, c, teacher, _, _, _ = env
+    exam_at = w3.eth.get_block("latest")["timestamp"]
+    add(c, teacher, LECTURE, "Intro")
+    add(c, teacher, EXAM, "Midterm", exam_at=exam_at)
+    with pytest.raises(REVERT):  # a correction cannot revise a lecture
+        add(c, teacher, CORRECTION, "Bad link", exam_at=exam_at, has_prev=True, prev_id=0)
+    with pytest.raises(REVERT):  # its unlock date must match the exam's
+        add(c, teacher, CORRECTION, "Bad date", exam_at=exam_at + DAY, has_prev=True, prev_id=1)
+    add(c, teacher, CORRECTION, "Good correction", exam_at=exam_at, has_prev=True, prev_id=1)
+    assert c.functions.materialCount().call() == 3
+
+
 # Rule: a student sees only their own grade.
 def test_grade_is_private(env):
     _, c, teacher, alice, bob, _ = env
@@ -177,3 +198,36 @@ def test_revision_is_append_only(env):
     _, _, _, has_prev1, prev_id1, _, _ = c.functions.getMeta(1).call({"from": teacher})
     assert title0 == "Exam v1"
     assert (has_prev1, prev_id1) == (True, 0)
+
+
+def test_class_info_versions_are_append_only(env):
+    _, contract, teacher, alice, _, outsider = env
+    original = contract.functions.classInfoAt(0).call({"from": outsider})
+    with pytest.raises(REVERT):
+        contract.functions.setClassInfo("Unauthorized", "Change").transact({"from": alice})
+    contract.functions.setClassInfo("New description", "New organization").transact({"from": teacher})
+    assert contract.functions.classInfoVersionCount().call() == 2
+    assert contract.functions.classInfoAt(0).call({"from": outsider}) == original
+    assert contract.functions.classInfoAt(1).call() == ["New description", "New organization"]
+    assert contract.functions.classDescription().call() == "New description"
+    assert contract.functions.classOrganization().call() == "New organization"
+
+
+def test_grade_versions_are_append_only_and_private(env):
+    _, contract, teacher, alice, bob, outsider = env
+    contract.functions.enroll(alice).transact({"from": teacher})
+    contract.functions.publishGrade(alice, "A").transact({"from": teacher})
+    with pytest.raises(REVERT):
+        contract.functions.publishGrade(alice, "Unauthorized").transact({"from": bob})
+    contract.functions.publishGrade(alice, "B").transact({"from": teacher})
+    assert contract.functions.myGrade().call({"from": alice}) == [True, "B"]
+    assert contract.functions.gradeOf(alice).call({"from": teacher}) == [True, "B"]
+    for reader in (teacher, alice):
+        assert contract.functions.gradeVersionCount(alice).call({"from": reader}) == 2
+        assert contract.functions.gradeAt(alice, 0).call({"from": reader}) == "A"
+        assert contract.functions.gradeAt(alice, 1).call({"from": reader}) == "B"
+    for reader in (bob, outsider):
+        with pytest.raises(REVERT):
+            contract.functions.gradeVersionCount(alice).call({"from": reader})
+        with pytest.raises(REVERT):
+            contract.functions.gradeAt(alice, 0).call({"from": reader})

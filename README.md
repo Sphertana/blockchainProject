@@ -83,7 +83,7 @@ make verify
 
 Cette commande exécute :
 
-- **19 tests** du contrat et de sécurité ;
+- **23 tests** du contrat et de sécurité, dont les historiques V4 sans écrasement ;
 - un parcours E2E complet par HTTP ;
 - la vérification P2P des 4 copies de la chaîne ;
 - le consensus QBFT avec 3 validateurs sur 4 ;

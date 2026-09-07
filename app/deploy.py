@@ -20,7 +20,8 @@ def main() -> None:
             address = Web3.to_checksum_address(existing)
             if w3.eth.get_code(address):
                 current = w3.eth.contract(address=address, abi=ARTIFACT["abi"])
-                current.functions.statusOf(acct.address).call()
+                if current.functions.CONTRACT_VERSION().call() != 4:
+                    raise ContractLogicError("unsupported contract version")
                 print("ClassLedger already deployed at", existing)
                 return
             print("Existing ClassLedger address has no code; redeploying")
