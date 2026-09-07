@@ -3,6 +3,7 @@
 import os
 
 from web3 import Web3
+from web3.exceptions import ContractLogicError
 
 from app.chain import ARTIFACT, contract_address, get_w3, save_address, teacher_account, wait_for_rpc
 
@@ -12,16 +13,21 @@ def main() -> None:
     if not wait_for_rpc(w3):
         raise SystemExit("blockchain RPC not reachable")
 
+    acct = teacher_account(w3)
     existing = contract_address()
     if existing:
         try:
-            if w3.eth.get_code(Web3.to_checksum_address(existing)):
+            address = Web3.to_checksum_address(existing)
+            if w3.eth.get_code(address):
+                current = w3.eth.contract(address=address, abi=ARTIFACT["abi"])
+                current.functions.statusOf(acct.address).call()
                 print("ClassLedger already deployed at", existing)
                 return
-        except ValueError:
+            print("Existing ClassLedger address has no code; redeploying")
+        except (ValueError, ContractLogicError):
+            print("Existing ClassLedger is incompatible; redeploying current version")
             pass
 
-    acct = teacher_account(w3)
     factory = w3.eth.contract(abi=ARTIFACT["abi"], bytecode=ARTIFACT["bytecode"])
     description = os.environ.get("CLASS_DESCRIPTION", "Blockchain 101 — distributed ledgers")
     organization = os.environ.get("CLASS_ORGANIZATION", "ISEP — Fall 2026, Room B12, Fridays 10:00")

@@ -92,7 +92,7 @@ services:
     volumes:
       - ../data:/app/data
     ports:
-      - "${WEB_PORT:-8000}:8000"
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8000}:8000"
     healthcheck:
       test:
         - CMD
@@ -102,6 +102,27 @@ services:
       interval: 3s
       timeout: 3s
       retries: 40
+    networks:
+      - besu
+
+  caddy:
+    image: caddy:2.10-alpine
+    container_name: classledger-caddy
+    profiles: [azure]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
     networks:
       - besu
 
@@ -117,3 +138,5 @@ volumes:
   v2data:
   v3data:
   v4data:
+  caddy_data:
+  caddy_config:

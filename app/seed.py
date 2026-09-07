@@ -1,11 +1,16 @@
-"""Seed the demo: enroll the two students and add one sample lecture."""
+"""Seed the demo: put the two students in the class and add one sample lecture.
+
+student1 is added straight from the teacher's roster; student2 goes through the
+real workflow (they sign their own request, the teacher approves) so the demo
+starts with both paths already exercised on-chain.
+"""
 
 import os
 
 from web3 import Web3
 
 from app import files
-from app.chain import get_contract, get_w3, send_as_teacher, wait_for_rpc
+from app.chain import get_contract, get_w3, send_as, send_as_teacher, wait_for_rpc
 
 
 def main() -> None:
@@ -15,11 +20,18 @@ def main() -> None:
     if c is None:
         raise SystemExit("contract not deployed — run `make deploy` first")
 
-    for var in ("STUDENT1_ADDRESS", "STUDENT2_ADDRESS"):
-        addr = Web3.to_checksum_address(os.environ[var])
-        if not c.functions.isEnrolled(addr).call():
-            send_as_teacher(w3, c.functions.enroll(addr))
-            print("enrolled", addr)
+    addr1 = Web3.to_checksum_address(os.environ["STUDENT1_ADDRESS"])
+    if not c.functions.isEnrolled(addr1).call():
+        send_as_teacher(w3, c.functions.enroll(addr1))
+        print("enrolled directly", addr1)
+
+    addr2 = Web3.to_checksum_address(os.environ["STUDENT2_ADDRESS"])
+    if not c.functions.isEnrolled(addr2).call():
+        if c.functions.statusOf(addr2).call() != 1:  # 1 = PENDING
+            send_as(w3, c.functions.requestEnrollment(), os.environ["STUDENT2_PRIVATE_KEY"])
+            print("enrollment requested by", addr2)
+        send_as_teacher(w3, c.functions.approveEnrollment(addr2))
+        print("approved", addr2)
 
     if c.functions.materialCount().call() == 0:
         content = b"Welcome to Blockchain 101.\n"

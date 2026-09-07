@@ -1,16 +1,48 @@
 {% extends "base.html" %}
+{% block title %}Preuve chaîne · Registre de classe{% endblock %}
 {% block content %}
-<h1>Preuve blockchain</h1>
-<table class="card">
-  <tr><th>Connecté au nœud</th><td>{{ info.connected }}</td></tr>
-  <tr><th>Chain ID</th><td>{{ info.chain_id }}</td></tr>
-  <tr><th>Dernier bloc</th><td>{{ info.block }}</td></tr>
-  <tr><th>Pairs connectés</th><td>{{ info.peers }}</td></tr>
-  <tr><th>Validateurs QBFT</th><td>{{ info.validators|length }}</td></tr>
-  <tr><th>Adresse du contrat</th><td class="mono">{{ info.address }}</td></tr>
-</table>
+
+<div class="page-head">
+  <h1>Preuve blockchain</h1>
+  <p>État réel du réseau, interrogé en direct sur le nœud passerelle.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="n">{{ info.block if info.block is not none else '—' }}</div><div class="l">Dernier bloc</div></div>
+  <div class="stat"><div class="n">{{ info.validators|length }}</div><div class="l">Validateurs QBFT</div></div>
+  <div class="stat"><div class="n">{{ info.peers if info.peers is not none else '—' }}</div><div class="l">Pairs P2P</div></div>
+  <div class="stat"><div class="n">{{ info.chain_id if info.chain_id is not none else '—' }}</div><div class="l">Chain ID</div></div>
+</div>
+
+<section class="card">
+  <header>
+    <h2>Passerelle</h2>
+    <p>{% if info.connected %}<span class="badge ok">connectée</span>{% else %}<span class="badge no">hors ligne</span>{% endif %}</p>
+  </header>
+  <dl class="kv">
+    <dt>Adresse du contrat</dt><dd class="mono">{{ info.address or '—' }}</dd>
+    <dt>Consensus</dt><dd>QBFT — tolère la panne d'un validateur sur quatre</dd>
+    <dt>Type de réseau</dt><dd>Privé, permissionné, gas à zéro</dd>
+  </dl>
+</section>
+
 {% if info.validators %}
-<h2>Validateurs</h2>
-<div class="mono">{% for v in info.validators %}<p>{{ v }}</p>{% endfor %}</div>
+<section class="card">
+  <header>
+    <h2>Validateurs du dernier bloc</h2>
+    <p>Chaque bloc doit être approuvé par une majorité qualifiée de ces nœuds.</p>
+  </header>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>#</th><th>Adresse du validateur</th></tr></thead>
+      <tbody>
+        {% for v in info.validators %}
+        <tr><td class="muted">{{ loop.index }}</td><td class="mono">{{ v }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
 {% endif %}
+
 {% endblock %}

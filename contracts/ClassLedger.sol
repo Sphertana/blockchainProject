@@ -12,6 +12,15 @@ contract ClassLedger {
         CORRECTION
     }
 
+    /// Lifecycle of a student in the class: the student applies for themselves
+    /// (signed transaction), the teacher decides. Every step is a chain event.
+    enum Status {
+        NONE,
+        PENDING,
+        ENROLLED,
+        REJECTED
+    }
+
     struct Material {
         Kind kind;
         string title;
@@ -30,13 +39,18 @@ contract ClassLedger {
     string public classOrganization; // public
 
     Material[] private materials;
-    mapping(address => bool) public isEnrolled;
-    address[] private students;
+
+    mapping(address => Status) public statusOf;
+    mapping(address => uint64) public appliedAt;
+    address[] private applicants; // every address that ever applied, in order
+    address[] private students; // approved only
 
     mapping(address => bool) private gradePublished;
     mapping(address => string) private grade; // readable only by its owner or the teacher
 
+    event EnrollmentRequested(address indexed student, uint64 at);
     event Enrolled(address indexed student);
+    event EnrollmentRejected(address indexed student);
     event MaterialAdded(uint256 indexed id, Kind kind, string title);
     event GradePublished(address indexed student); // never logs the grade value
 
@@ -51,18 +65,74 @@ contract ClassLedger {
         classOrganization = organization;
     }
 
+    // --- enrollment: the student applies, the teacher decides ---
+
+    /// Anyone can apply for themselves; only the teacher can approve.
+    /// A rejected applicant may apply again — the history stays in the events.
+    function requestEnrollment() external {
+        require(msg.sender != teacher, "teacher cannot enroll");
+        Status s = statusOf[msg.sender];
+        require(s == Status.NONE || s == Status.REJECTED, "already applied");
+        if (s == Status.NONE) {
+            applicants.push(msg.sender);
+        }
+        statusOf[msg.sender] = Status.PENDING;
+        appliedAt[msg.sender] = uint64(block.timestamp);
+        emit EnrollmentRequested(msg.sender, uint64(block.timestamp));
+    }
+
+    function approveEnrollment(address student) external onlyTeacher {
+        require(statusOf[student] == Status.PENDING, "no pending request");
+        _admit(student);
+    }
+
+    function rejectEnrollment(address student) external onlyTeacher {
+        require(statusOf[student] == Status.PENDING, "no pending request");
+        statusOf[student] = Status.REJECTED;
+        emit EnrollmentRejected(student);
+    }
+
+    /// Direct enrollment by the teacher (roster import, no prior request).
+    function enroll(address student) external onlyTeacher {
+        require(statusOf[student] != Status.ENROLLED, "already enrolled");
+        if (statusOf[student] == Status.NONE) {
+            applicants.push(student);
+        }
+        _admit(student);
+    }
+
+    function _admit(address student) private {
+        statusOf[student] = Status.ENROLLED;
+        students.push(student);
+        emit Enrolled(student);
+    }
+
+    function isEnrolled(address account) public view returns (bool) {
+        return statusOf[account] == Status.ENROLLED;
+    }
+
+    /// Addresses waiting for a decision — the teacher's approval queue.
+    function pendingApplicants() external view onlyTeacher returns (address[] memory list) {
+        uint256 n;
+        for (uint256 i = 0; i < applicants.length; i++) {
+            if (statusOf[applicants[i]] == Status.PENDING) n++;
+        }
+        list = new address[](n);
+        uint256 k;
+        for (uint256 i = 0; i < applicants.length; i++) {
+            if (statusOf[applicants[i]] == Status.PENDING) list[k++] = applicants[i];
+        }
+    }
+
+    function enrolledStudents() external view onlyTeacher returns (address[] memory) {
+        return students;
+    }
+
     // --- teacher-only writes ---
 
     function setClassInfo(string calldata description, string calldata organization) external onlyTeacher {
         classDescription = description;
         classOrganization = organization;
-    }
-
-    function enroll(address student) external onlyTeacher {
-        require(!isEnrolled[student], "already enrolled");
-        isEnrolled[student] = true;
-        students.push(student);
-        emit Enrolled(student);
     }
 
     function addMaterial(
@@ -97,7 +167,7 @@ contract ClassLedger {
     }
 
     function publishGrade(address student, string calldata value) external onlyTeacher {
-        require(isEnrolled[student], "not enrolled");
+        require(isEnrolled(student), "not enrolled");
         grade[student] = value;
         gradePublished[student] = true;
         emit GradePublished(student);
@@ -112,7 +182,7 @@ contract ClassLedger {
     /// Rule engine: who may see a given material right now.
     function _visible(Material storage m) internal view returns (bool) {
         if (msg.sender == teacher) return true;
-        if (!isEnrolled[msg.sender]) return false;
+        if (!isEnrolled(msg.sender)) return false;
         if (m.kind == Kind.EXAM || m.kind == Kind.CORRECTION) {
             return block.timestamp >= uint256(m.examAt) + EXAM_DELAY;
         }
@@ -128,12 +198,20 @@ contract ClassLedger {
     function getMeta(uint256 id)
         external
         view
-        returns (Kind kind, string memory title, uint64 examAt, bool hasPrev, uint256 prevId, bool accessible)
+        returns (
+            Kind kind,
+            string memory title,
+            uint64 examAt,
+            bool hasPrev,
+            uint256 prevId,
+            bool accessible,
+            uint64 createdAt
+        )
     {
         require(id < materials.length, "bad id");
-        require(msg.sender == teacher || isEnrolled[msg.sender], "forbidden");
+        require(msg.sender == teacher || isEnrolled(msg.sender), "forbidden");
         Material storage m = materials[id];
-        return (m.kind, m.title, m.examAt, m.hasPrev, m.prevId, _visible(m));
+        return (m.kind, m.title, m.examAt, m.hasPrev, m.prevId, _visible(m), m.createdAt);
     }
 
     /// File reference + hash, only when the caller may actually access the file.
@@ -155,11 +233,5 @@ contract ClassLedger {
 
     function studentCount() external view returns (uint256) {
         return students.length;
-    }
-
-    function studentAt(uint256 i) external view returns (address) {
-        require(msg.sender == teacher, "forbidden");
-        require(i < students.length, "bad index");
-        return students[i];
     }
 }

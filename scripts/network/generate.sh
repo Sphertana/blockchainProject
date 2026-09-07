@@ -6,7 +6,8 @@ cd "$(dirname "$0")/../.."
 BESU_IMAGE="${BESU_IMAGE:-hyperledger/besu:26.2.0}"
 
 # Besu 26.2 rejects a --to directory created on a macOS bind mount mid-command.
-docker run --rm -v "$PWD/network:/network" --entrypoint sh "$BESU_IMAGE" -c '
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/network:/network" --entrypoint sh "$BESU_IMAGE" -c '
   rm -rf /network/networkFiles /network/data /tmp/generated
   besu operator generate-blockchain-config \
     --config-file=/network/qbft-config.json \

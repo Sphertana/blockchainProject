@@ -26,6 +26,10 @@ network/networkFiles/
 # Local project skill: guides local work, intentionally not part of the public repo
 .github/skills/
 
+# Personal explanation notes (how the project was built / Azure setup) — not for the public repo
+EXPLICATIONS_PERSO.md
+
 # Local Azure deployment state
 scripts/azure/.vm_ip
+scripts/azure/.vm_host
 scripts/azure/.demo_credentials

@@ -1,14 +1,74 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Description de la classe</h1>
-{% if deployed %}
-  <div class="card">
-    <p><strong>Description :</strong> {{ description }}</p>
-    <p><strong>Organisation :</strong> {{ organization }}</p>
+
+<section class="hero">
+  <span class="eyebrow">Information publique · lue sur la blockchain</span>
+  {% if deployed %}
+    <h1>{{ description }}</h1>
+    <p>{{ organization }}</p>
+  {% else %}
+    <h1>Registre de classe sur blockchain privée</h1>
+    <p>Le registre n'est pas encore déployé sur la chaîne. Lancez <code>make deploy</code>.</p>
+  {% endif %}
+  <div class="actions">
+    {% if not user %}
+      <a class="btn" href="/register">Demander mon inscription</a>
+      <a class="btn btn-ghost" href="/login">J'ai déjà un compte</a>
+    {% else %}
+      <a class="btn" href="/dashboard">Aller au tableau de bord</a>
+    {% endif %}
   </div>
-  <p class="muted">Ces informations sont publiques et lues directement sur la blockchain.</p>
-{% else %}
-  <p class="muted">Le registre n'est pas encore déployé sur la blockchain.</p>
+</section>
+
+{% if deployed %}
+<div class="stats">
+  <div class="stat"><div class="n">{{ stats.materials }}</div><div class="l">Documents</div></div>
+  <div class="stat"><div class="n">{{ stats.students }}</div><div class="l">Inscrits</div></div>
+  <div class="stat"><div class="n">4</div><div class="l">Validateurs QBFT</div></div>
+  <div class="stat"><div class="n">{{ stats.block }}</div><div class="l">Blocs</div></div>
+</div>
 {% endif %}
-{% if not user %}<p><a class="btn" href="/login">Connexion</a></p>{% endif %}
+
+<section class="card">
+  <header>
+    <h2>Règles d'accès appliquées par le contrat</h2>
+    <p>Aucune de ces règles n'est décidée par le site : elles sont dans la blockchain.</p>
+  </header>
+  <div class="rules">
+    <div class="rule">
+      <span class="n">1</span>
+      <h3>Description &amp; organisation</h3>
+      <p>Publiques, visibles par toute l'école — y compris sans compte.</p>
+    </div>
+    <div class="rule">
+      <span class="n">2</span>
+      <h3>Cours &amp; TP</h3>
+      <p>Réservés aux étudiants inscrits et approuvés par l'enseignant.</p>
+    </div>
+    <div class="rule">
+      <span class="n">3</span>
+      <h3>Examens &amp; corrections</h3>
+      <p>Déverrouillés automatiquement 24 h après la date de l'examen.</p>
+    </div>
+    <div class="rule">
+      <span class="n">4</span>
+      <h3>Notes</h3>
+      <p>Chaque étudiant ne peut lire que sa propre note, jamais celle des autres.</p>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <header>
+    <h2>Comment rejoindre la classe</h2>
+    <p>L'enseignant garde la main : rien n'est automatique.</p>
+  </header>
+  <ol class="steps">
+    <li>Créez un compte — un portefeuille blockchain vous est attribué.</li>
+    <li>Envoyez votre demande d'inscription : c'est une transaction signée par vous.</li>
+    <li>L'enseignant approuve ou refuse ; sa décision est écrite dans un bloc.</li>
+    <li>Une fois approuvé, le contrat vous ouvre les cours, TP, examens et votre note.</li>
+  </ol>
+</section>
+
 {% endblock %}

@@ -1,59 +1,164 @@
 {% extends "base.html" %}
+{% block title %}Espace enseignant · Registre de classe{% endblock %}
 {% block content %}
-<h1>Espace enseignant</h1>
+
+<div class="page-head">
+  <h1>Espace enseignant</h1>
+  <p>Vous êtes le seul compte autorisé à écrire dans le registre.</p>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="n">{{ pending|length }}</div><div class="l">Demandes en attente</div></div>
+  <div class="stat"><div class="n">{{ students|length }}</div><div class="l">Étudiants inscrits</div></div>
+  <div class="stat"><div class="n">{{ materials|length }}</div><div class="l">Documents publiés</div></div>
+  <div class="stat"><div class="n">{{ students|selectattr('published')|list|length }}</div><div class="l">Notes publiées</div></div>
+</div>
 
 <section class="card">
-  <h2>Inscrire un étudiant</h2>
-  <form method="post" action="/enroll" class="row">
-    <input name="address" placeholder="0x… adresse de l'étudiant" required>
-    <button type="submit">Inscrire</button>
-  </form>
+  <header>
+    <h2>Demandes d'inscription</h2>
+    <p>Chaque décision est une transaction signée, inscrite dans un bloc.</p>
+  </header>
+  {% if pending %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Étudiant</th><th>Adresse</th><th>Demandé le</th><th class="right">Décision</th></tr>
+      </thead>
+      <tbody>
+        {% for p in pending %}
+        <tr>
+          <td><strong>{{ p.name or 'inconnu' }}</strong></td>
+          <td class="mono">{{ p.address }}</td>
+          <td class="muted">{{ p.at | dt }}</td>
+          <td class="right">
+            <form method="post" action="/enrollment/decide" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="address" value="{{ p.address }}">
+              <input type="hidden" name="action" value="approve">
+              <button class="btn-sm btn-ok" type="submit">Approuver</button>
+            </form>
+            <form method="post" action="/enrollment/decide" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+              <input type="hidden" name="address" value="{{ p.address }}">
+              <input type="hidden" name="action" value="reject">
+              <button class="btn-sm btn-danger" type="submit">Refuser</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">Aucune demande en attente.</p>
+  {% endif %}
 </section>
 
 <section class="card">
-  <h2>Déposer un document</h2>
-  <form method="post" action="/material" enctype="multipart/form-data" class="grid">
-    <label>Type
-      <select name="kind">
-        {% for value, name in kinds %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
-      </select>
+  <header>
+    <h2>Déposer un document</h2>
+    <p>Le fichier reste sur le serveur ; son empreinte SHA-256 est ancrée sur la chaîne.</p>
+  </header>
+  <form method="post" action="/material" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="field-grid">
+      <label>Type de document
+        <select name="kind">
+          {% for value, name in kinds %}<option value="{{ value }}">{{ name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Titre
+        <input name="title" placeholder="ex. Cours 3 — Consensus BFT" required>
+      </label>
+      <label>Date de l'examen <span class="opt">— examens et corrections</span>
+        <input type="datetime-local" name="exam_at">
+      </label>
+      <label>Révise le document n° <span class="opt">— optionnel</span>
+        <input name="prev_id" inputmode="numeric" placeholder="ex. 0">
+      </label>
+    </div>
+    <label>Fichier <span class="opt">— 10 Mo maximum</span>
+      <input type="file" name="file" required>
     </label>
-    <label>Titre <input name="title" required></label>
-    <label>Date d'examen <input type="datetime-local" name="exam_at"></label>
-    <label>Révise le document n° <input name="prev_id" placeholder="optionnel, ex. 0"></label>
-    <label>Fichier <input type="file" name="file" required></label>
     <button type="submit">Publier sur la blockchain</button>
   </form>
-  <p class="muted">Examen et correction ne deviennent visibles que 24 h après la date d'examen.</p>
+  <p class="hint">
+    Un examen ou sa correction reste verrouillé pour les étudiants jusqu'à 24 h après la date saisie.
+    Rien n'est jamais modifié : une correction crée une nouvelle version qui pointe vers l'ancienne.
+  </p>
 </section>
 
 <section class="card">
-  <h2>Documents publiés</h2>
-  <table>
-    <tr><th>#</th><th>Type</th><th>Titre</th><th>Version</th><th>Accès</th><th></th></tr>
-    {% for m in materials %}
-    <tr>
-      <td>{{ m.id }}</td><td>{{ m.kind }}</td><td>{{ m.title }}</td>
-      <td>{% if m.has_prev %}révise #{{ m.prev_id }}{% else %}—{% endif %}</td>
-      <td>{% if m.accessible %}ouvert{% else %}verrouillé{% endif %}</td>
-      <td><a href="/material/{{ m.id }}/download">Télécharger</a></td>
-    </tr>
-    {% endfor %}
-  </table>
+  <header>
+    <h2>Documents publiés</h2>
+    <p>{{ materials|length }} entrée(s) — ordre du plus récent au plus ancien.</p>
+  </header>
+  {% if materials %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Type</th><th>Titre</th><th>Version</th><th>Accès étudiants</th><th class="right"></th></tr>
+      </thead>
+      <tbody>
+        {% for m in materials %}
+        <tr>
+          <td class="muted">{{ m.id }}</td>
+          <td><span class="badge kind">{{ m.kind }}</span></td>
+          <td><strong>{{ m.title }}</strong><br><span class="muted small">{{ m.created_at | dt }}</span></td>
+          <td class="muted">{% if m.has_prev %}révise #{{ m.prev_id }}{% else %}—{% endif %}</td>
+          <td>
+            {% if m.accessible %}<span class="badge ok">ouvert</span>
+            {% else %}<span class="badge lock">verrouillé → {{ m.unlocks_at | dt }}</span>{% endif %}
+          </td>
+          <td class="right"><a class="btn btn-sm btn-ghost" href="/material/{{ m.id }}/download">Télécharger</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">Aucun document publié pour l'instant.</p>
+  {% endif %}
 </section>
 
 <section class="card">
-  <h2>Notes</h2>
-  <form method="post" action="/grade" class="row">
-    <input name="address" placeholder="0x… adresse de l'étudiant" required>
-    <input name="value" placeholder="ex. A ou 16/20" required>
+  <header>
+    <h2>Notes</h2>
+    <p>Une note n'est lisible que par son titulaire — et par vous.</p>
+  </header>
+  {% if students %}
+  <form method="post" action="/grade" class="inline">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Étudiant
+      <select name="address" required>
+        {% for s in students %}
+        <option value="{{ s.address }}">{{ s.name or s.address }}{% if s.published %} — actuellement {{ s.grade }}{% endif %}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Note
+      <input name="value" placeholder="ex. 16/20" required>
+    </label>
     <button type="submit">Publier la note</button>
   </form>
-  <table>
-    <tr><th>Étudiant</th><th>Note</th></tr>
-    {% for s in students %}
-    <tr><td class="mono">{{ s.address }}</td><td>{% if s.published %}{{ s.grade }}{% else %}—{% endif %}</td></tr>
-    {% endfor %}
-  </table>
+  <div class="table-wrap mt-1">
+    <table>
+      <thead><tr><th>Étudiant</th><th>Adresse</th><th class="right">Note</th></tr></thead>
+      <tbody>
+        {% for s in students %}
+        <tr>
+          <td><strong>{{ s.name or 'inconnu' }}</strong></td>
+          <td class="mono">{{ s.address }}</td>
+          <td class="right">{% if s.published %}<span class="badge ok">{{ s.grade }}</span>{% else %}<span class="badge">non publiée</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">Aucun étudiant inscrit : approuvez d'abord une demande.</p>
+  {% endif %}
 </section>
+
 {% endblock %}

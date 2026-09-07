@@ -1,139 +1,269 @@
-# Class Ledger on a Private Blockchain
+# ClassLedger
 
-A minimal system that stores and shares one class's **lectures, labs, exams,
-corrections and grades** on a private, permissioned blockchain, enforcing four
-access rules directly in a smart contract.
+Registre de classe sur une blockchain privée **Hyperledger Besu**.
 
-- **Blockchain:** Hyperledger Besu, 4 validators, **QBFT** consensus (tolerates 1 failure).
-- **Smart contract:** `ClassLedger.sol` (Solidity) — holds the data model and all access rules.
-- **App:** Python **FastAPI** + Jinja2, server-rendered, talks to a node over internal RPC.
-- **Files:** stored on the server disk; only their **SHA-256** and metadata go on-chain.
-- **Hosting:** one Azure Ubuntu VM with Docker Compose.
+Le projet permet à un enseignant de publier des cours, TP, examens, corrections
+et notes, avec des règles d'accès appliquées directement par un smart contract.
 
-## The four access rules
+## Lancer le projet
 
-| # | Rule | Where enforced |
-|---|------|----------------|
-| 1 | Class description & organization are **public** | `classDescription` / `classOrganization` |
-| 2 | Lectures & labs → **enrolled students only** | `getFile` / `getMeta` check `isEnrolled` |
-| 3 | Exams & corrections → enrolled, and **24 h after the exam date** | `now >= examAt + 24h` |
-| 4 | Each student sees **only their own grade** | `myGrade` / `gradeOf` gate on `msg.sender` |
+### Prérequis
 
-Immutability: nothing is updated or deleted; a correction is a **new version** that
-links to the previous one.
+- Git
+- Docker Desktop ou Docker Engine
+- Docker Compose v2
+- Make
+
+Docker doit être démarré avant de continuer.
+
+### Installation
+
+```bash
+git clone https://github.com/Sphertana/blockchainProject.git
+cd blockchainProject
+make demo
+```
+
+`make demo` fait tout automatiquement : génération du réseau, construction des
+images, démarrage des 4 validateurs, déploiement du contrat et ajout des données
+de démonstration.
+
+Le premier lancement peut prendre quelques minutes.
+
+Ouvrir ensuite : **<http://localhost:8000/>**
+
+### Comptes de démonstration
+
+| Rôle | Identifiant | Mot de passe |
+|---|---|---|
+| Enseignant | `teacher` | `teacher` |
+| Étudiant 1 | `student1` | `student1` |
+| Étudiant 2 | `student2` | `student2` |
+
+Vérifier que l'application répond :
+
+```bash
+curl http://localhost:8000/health
+```
+
+Résultat attendu :
+
+```json
+{"rpc":true,"contract":"0x..."}
+```
+
+## Ce que montre la démonstration
+
+| Règle | Comportement |
+|---|---|
+| Informations publiques | la description et l'organisation sont visibles sans connexion |
+| Cours et TP | accessibles uniquement aux étudiants inscrits |
+| Examens et corrections | accessibles aux inscrits 24 h après l'examen |
+| Notes | chaque étudiant ne voit que sa propre note |
+| Immutabilité | une correction crée une nouvelle version sans effacer l'ancienne |
+
+### Parcours conseillé
+
+1. Ouvrir l'accueil sans se connecter : les informations publiques apparaissent.
+2. Créer un nouveau compte étudiant et demander l'inscription.
+3. Se connecter comme `teacher` et approuver la demande.
+4. Publier un cours, puis un examen daté du jour.
+5. Publier une note pour `student1`.
+6. Se connecter comme `student1` : le cours et sa note sont visibles, l'examen est verrouillé.
+7. Se connecter comme `student2` : la note de `student1` reste invisible.
+8. Ouvrir **Preuve chaîne** pour voir les blocs, les pairs et les validateurs.
+
+## Tester le projet
+
+Après `make demo`, lancer toute la campagne :
+
+```bash
+make verify
+```
+
+Cette commande exécute :
+
+- **19 tests** du contrat et de sécurité ;
+- un parcours E2E complet par HTTP ;
+- la vérification P2P des 4 copies de la chaîne ;
+- le consensus QBFT avec 3 validateurs sur 4 ;
+- le blocage du consensus avec seulement 2 validateurs ;
+- le rattrapage des nœuds après redémarrage ;
+- la détection d'un fichier falsifié ;
+- le chiffrement des notes stockées sur la chaîne.
+
+Les suites peuvent aussi être lancées séparément :
+
+```bash
+make test        # contrat et sécurité
+make smoke       # parcours E2E
+make compliance  # réplication P2P et consensus QBFT
+```
+
+Les tests E2E ajoutent des données. Pour revenir à la démonstration initiale :
+
+```bash
+make clean
+rm -rf data
+make demo
+```
+
+## Commandes utiles
+
+| Commande | Utilité |
+|---|---|
+| `make demo` | lancer toute la démonstration |
+| `make ps` | voir l'état des conteneurs |
+| `make logs` | suivre les journaux |
+| `make verify` | exécuter tous les tests |
+| `make down` | arrêter sans perdre les données |
+| `make up` | reprendre après un arrêt |
+| `make clean` | supprimer la chaîne locale |
+| `make help` | afficher toutes les commandes |
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  U[Browser] -- HTTP --> API[FastAPI gateway]
-  API -- signed tx / eth_call as user --> V1[(validator1)]
-  V1 --- V2[(validator2)]
-  V1 --- V3[(validator3)]
-  V1 --- V4[(validator4)]
+  U[Navigateur] --> API[FastAPI]
+  API --> F[(Fichiers)]
+  API --> DB[(SQLite)]
+  API -- RPC privé --> V1[(Besu 1)]
+  V1 --- V2[(Besu 2)]
+  V1 --- V3[(Besu 3)]
+  V1 --- V4[(Besu 4)]
   V2 --- V3
+  V2 --- V4
   V3 --- V4
-  API -- read/write files --> D[(disk: data/files)]
-  subgraph QBFT private network
-    V1
-    V2
-    V3
-    V4
-  end
 ```
 
-Reads carry the user's address as `msg.sender` via `eth_call`, so the **contract**
-decides visibility; the gateway only mirrors the result and keeps the RPC private.
+- **Blockchain :** Hyperledger Besu, 4 validateurs, consensus QBFT.
+- **Contrat :** Solidity, règles d'accès et données immuables.
+- **Application :** FastAPI et pages Jinja2.
+- **Fichiers :** conservés sur disque ; seul leur SHA-256 est ancré sur la chaîne.
+- **Notes :** chiffrées en AES-256-GCM avant leur écriture on-chain.
+- **Comptes :** mots de passe Argon2 et keystores Ethereum chiffrés.
 
-## Prerequisites
+L'étudiant signe sa demande d'inscription. L'enseignant signe son approbation et
+les publications. Les lectures utilisent l'adresse de l'utilisateur comme
+`msg.sender`, afin que le contrat décide lui-même de l'accès.
 
-- Docker + Docker Compose v2
-- (Only to re-compile the contract) Python 3.11+ and internet for `solc`
+## Déploiement Azure
 
-## Quickstart (local)
+Azure est utilisé uniquement pour rendre la démonstration accessible sur
+Internet. Le projet fonctionne entièrement en local sans Azure.
 
-```bash
-make up        # generates QBFT keys, builds the app, starts 4 validators + API
-make deploy    # deploys ClassLedger and records its address
-make seed      # enrolls the 2 demo students and adds a sample lecture
-```
+### Première création
 
-Open <http://localhost:8000/>.
-
-Demo accounts (web logins only): `teacher` / `student1` / `student2`
-(passwords in `.env`, defaults `teacher` / `student1` / `student2`).
-
-Stop or reset:
-
-```bash
-make down      # stop containers
-make clean     # stop and delete generated keys + chain data
-```
-
-## Tests
-
-```bash
-make test      # 7 rule/integrity tests on an in-process EVM (fast, no Besu needed)
-make smoke     # end-to-end on the running stack (needs make up + make deploy)
-```
-
-`make test` covers the four rules plus append-only revisions. `make smoke` logs in
-as teacher and student over HTTP, checks the 24 h lock, grade privacy, and a
-hash-verified download.
-
-## Deploy on Azure
-
-One Ubuntu VM, Docker Compose, HTTP on port 80.
+Prérequis : Azure CLI, un abonnement Azure, SSH et `rsync`.
 
 ```bash
 az login
-scripts/azure/up.sh       # create the VM (Docker via cloud-init)
-scripts/azure/deploy.sh   # copy the repo, start, deploy, seed
-# ... demo at http://<vm-ip>/ ...
-scripts/azure/stop.sh     # deallocate the VM (stops compute billing)
-scripts/azure/destroy.sh  # delete everything
+scripts/azure/up.sh
+scripts/azure/deploy.sh
 ```
 
-The first deploy generates random web passwords and saves them locally in
-`scripts/azure/.demo_credentials` (git-ignored). Add an email threshold to the
-created `classledger-budget` in Azure Cost Management. HTTP is intentionally
-limited to this short-lived demo; do not use real student data or passwords.
+Les scripts créent une VM Ubuntu, installent Docker, attribuent un nom DNS,
+activent HTTPS avec Caddy, déploient le projet et exécutent le smoke test.
 
-The four validators run as four containers on this single VM — cost-effective for
-a demo, not a production topology (which would spread them across hosts/orgs).
+Afficher l'adresse et les mots de passe Azure :
 
-The Azure workflow was validated end to end on 6 September 2026: public login,
-all access-rule smoke checks, one-validator QBFT tolerance, private RPC/P2P ports,
-and persistence after a full Compose restart.
-
-## Configuration
-
-Copy `.env.example` to `.env` (done automatically by `make up`). Keys there are
-**public Besu test accounts**, safe only because this is an isolated zero-gas
-chain. The teacher is the only account that signs transactions.
-
-| Variable | Meaning |
-|----------|---------|
-| `RPC_URL` | Node RPC the gateway uses (internal) |
-| `TEACHER_ADDRESS` / `TEACHER_PRIVATE_KEY` | The only writer |
-| `STUDENT1_ADDRESS` / `STUDENT2_ADDRESS` | Enrolled readers |
-| `WEB_PORT` | Published web port (80 on Azure) |
-| `SESSION_SECRET` | Signed-cookie secret |
-
-## Limitations (by design)
-
-- Confidentiality is enforced by the gateway + a non-public RPC. **Any node
-  operator can read raw chain state** — inherent to blockchains; documented in the report.
-- One class, one teacher, two demo students. No notifications, payments, tokens, or SSO.
-- Demo validators share a single VM.
-
-## Layout
-
+```bash
+cat scripts/azure/.vm_host
+cat scripts/azure/.demo_credentials
 ```
-app/            FastAPI gateway (auth, chain, files, templates)
-contracts/      ClassLedger.sol + compiled artifact
-network/        Docker Compose + QBFT config
-scripts/        network generation, smoke test, Azure scripts
-tests/          contract-rule tests
-docs/           French report, slides, demo runbook
+
+Ces fichiers sont privés et ignorés par Git.
+
+### Redémarrer la VM existante
+
+```bash
+az login
+az vm start -g classledger-rg -n classledger-vm
 ```
+
+Attendre environ une minute puis vérifier :
+
+```bash
+curl "https://$(cat scripts/azure/.vm_host)/health"
+```
+
+Pour envoyer une nouvelle version du code :
+
+```bash
+scripts/azure/deploy.sh
+```
+
+### Arrêter les frais de calcul
+
+```bash
+scripts/azure/stop.sh
+```
+
+Cette commande désalloue la VM et arrête la facturation du compute. Le disque et
+l'IP publique restent conservés et peuvent encore entraîner un faible coût.
+
+Suppression définitive de toutes les ressources :
+
+```bash
+scripts/azure/destroy.sh
+```
+
+## Sécurité et limites
+
+- HTTPS, HSTS, CSP, cookies sécurisés et protection CSRF sur Azure.
+- RPC et ports P2P non exposés publiquement.
+- Vérification SHA-256 à chaque téléchargement.
+- Notes chiffrées avant stockage sur la blockchain.
+- Les 4 validateurs sont des conteneurs distincts, mais partagent une seule
+  machine physique : la distribution est logique, pas géographique.
+- La gateway conserve les clés chiffrées des étudiants et la clé de
+  déchiffrement des notes ; son opérateur reste donc une autorité de confiance.
+- Le système est une démonstration monoclasse, pas un ENT de production.
+
+Utiliser uniquement des données fictives.
+
+## En cas de problème
+
+### Docker ne répond pas
+
+Démarrer Docker Desktop, puis relancer :
+
+```bash
+make demo
+```
+
+### Un conteneur n'est pas sain
+
+```bash
+make ps
+make logs
+```
+
+Les 4 validateurs et `classledger-api` doivent être `healthy`.
+
+### Le port 8000 est occupé
+
+```bash
+cp .env.example .env
+```
+
+Modifier `WEB_PORT=8080` dans `.env`, relancer `make demo`, puis ouvrir
+<http://localhost:8080/>.
+
+### Repartir de zéro
+
+```bash
+make clean
+rm -rf data
+make demo
+```
+
+## Documentation
+
+- [Scénario de démonstration](docs/demo/runbook.md)
+- [Rapport technique](docs/report/)
+- [Présentation](docs/presentation/)
+
+Dernière recette complète : **7 septembre 2026** — tests locaux et Azure HTTPS
+réussis, 4 validateurs, 3 pairs par nœud et consensus QBFT vérifié.

@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Registre non déployé</h1>
-<p class="muted">Le contrat n'est pas encore déployé. Lancez <code>make deploy</code>.</p>
+<div class="page-head">
+  <h1>Registre non déployé</h1>
+</div>
+<div class="card">
+  <div class="alert info">Le contrat n'est pas encore déployé sur la chaîne.</div>
+  <p class="muted">Lancez <code>make deploy</code> puis <code>make seed</code>.</p>
+</div>
 {% endblock %}

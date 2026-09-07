@@ -7,22 +7,40 @@
   <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
 </head>
 <body>
-  <header>
-    <a class="brand" href="/">Registre de classe · blockchain</a>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <rect x="2.5" y="2.5" width="8" height="8" rx="2.2" stroke="#4338ca" stroke-width="1.7"/>
+        <rect x="13.5" y="2.5" width="8" height="8" rx="2.2" stroke="#4338ca" stroke-width="1.7"/>
+        <rect x="2.5" y="13.5" width="8" height="8" rx="2.2" stroke="#4338ca" stroke-width="1.7"/>
+        <rect x="13.5" y="13.5" width="8" height="8" rx="2.2" stroke="#4338ca" stroke-width="1.7"/>
+        <path d="M10.5 6.5h3M6.5 10.5v3M17.5 10.5v3M10.5 17.5h3" stroke="#4338ca" stroke-width="1.7" stroke-linecap="round"/>
+      </svg>
+      <span>Registre de classe<small>Hyperledger Besu · QBFT</small></span>
+    </a>
     <nav>
+      <a href="/" {% if request.url.path == '/' %}class="on"{% endif %}>Accueil</a>
       {% if user %}
-        <span class="who">{{ user.username }} · {{ user.role }}</span>
-        <a href="/dashboard">Tableau de bord</a>
-        <a href="/proof">Preuve</a>
-        <a href="/logout">Déconnexion</a>
+        <a href="/dashboard" {% if request.url.path == '/dashboard' %}class="on"{% endif %}>Tableau de bord</a>
+        <a href="/proof" {% if request.url.path == '/proof' %}class="on"{% endif %}>Preuve chaîne</a>
+        <span class="chip">{{ user.username }}<span class="role">{{ 'enseignant' if user.role == 'teacher' else 'étudiant' }}</span></span>
+        <form method="post" action="/logout" class="nav-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit">Déconnexion</button>
+        </form>
       {% else %}
-        <a href="/">Accueil</a>
-        <a href="/login">Connexion</a>
+        <a href="/login" {% if request.url.path == '/login' %}class="on"{% endif %}>Connexion</a>
+        <a class="btn btn-sm" href="/register">Créer un compte</a>
       {% endif %}
     </nav>
   </header>
   <main>
+    {% for m in messages %}<div class="alert {{ m.level }}">{{ m.text }}</div>{% endfor %}
     {% block content %}{% endblock %}
   </main>
+  <footer class="site">
+    Projet universitaire — blockchain privée permissionnée, 4 validateurs QBFT.
+    Aucune donnée réelle d'étudiant.
+  </footer>
 </body>
 </html>

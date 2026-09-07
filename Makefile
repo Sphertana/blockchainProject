@@ -1,18 +1,21 @@
 COMPOSE = docker compose --env-file .env -f network/docker-compose.yml
 
-.PHONY: help genkeys up down deploy seed smoke test compile logs ps clean
+.PHONY: help genkeys up down deploy seed demo smoke compliance test verify compile logs ps clean
 
 help:
-	@echo "make genkeys  - generate QBFT keys + genesis (once)"
-	@echo "make up        - start the 4-validator Besu network + web app"
-	@echo "make deploy    - compile-free deploy of ClassLedger + set class info"
-	@echo "make seed      - enroll demo students + add one sample lecture"
-	@echo "make smoke     - end-to-end check on the running network"
-	@echo "make test      - run contract rule tests (in container)"
-	@echo "make compile   - recompile the Solidity artifact (needs solc)"
-	@echo "make logs      - tail all container logs"
-	@echo "make down      - stop the network"
-	@echo "make clean     - stop and remove generated keys/chain data"
+	@echo "make genkeys    - générer les clés QBFT et le genesis"
+	@echo "make up         - démarrer les 4 validateurs et l'application"
+	@echo "make deploy     - déployer ou réutiliser le contrat ClassLedger"
+	@echo "make seed       - inscrire les comptes démo et ajouter un cours"
+	@echo "make demo       - lancer toute la démonstration locale"
+	@echo "make smoke      - exécuter le parcours E2E"
+	@echo "make compliance - tester la réplication P2P et le quorum QBFT"
+	@echo "make test       - exécuter les tests contrat et sécurité"
+	@echo "make verify     - exécuter toutes les suites de tests"
+	@echo "make compile    - recompiler le contrat Solidity"
+	@echo "make logs       - suivre les journaux des conteneurs"
+	@echo "make down       - arrêter le réseau sans supprimer les données"
+	@echo "make clean      - supprimer la chaîne et les clés générées"
 
 genkeys:
 	./scripts/network/generate.sh
@@ -26,13 +29,20 @@ down:
 	$(COMPOSE) down
 
 deploy:
-	$(COMPOSE) exec api python -m app.deploy
+	$(COMPOSE) exec -T --interactive=false api python -m app.deploy
 
 seed:
-	$(COMPOSE) exec api python -m app.seed
+	$(COMPOSE) exec -T --interactive=false api python -m app.seed
+
+demo: up deploy seed
 
 smoke:
 	./scripts/smoke.sh
+
+compliance:
+	./scripts/compliance.sh
+
+verify: test smoke compliance
 
 test:
 	$(COMPOSE) run --rm --no-deps --build api python -m pytest

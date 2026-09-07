@@ -1,25 +1,94 @@
 {% extends "base.html" %}
+{% block title %}Espace étudiant · Registre de classe{% endblock %}
 {% block content %}
-<h1>Espace étudiant</h1>
-{% if not enrolled %}
-  <p class="muted">Vous n'êtes pas encore inscrit dans cette classe.</p>
-{% else %}
+
+<div class="page-head">
+  <h1>Espace étudiant</h1>
+  <p>Votre adresse sur la chaîne : <span class="mono">{{ user.address }}</span></p>
+</div>
+
 <section class="card">
-  <h2>Ma note</h2>
-  <p>{% if published %}<strong>{{ grade }}</strong>{% else %}Pas encore publiée.{% endif %}</p>
+  <header>
+    <h2>Mon inscription</h2>
+    <p>Statut lu directement dans le contrat.</p>
+  </header>
+
+  {% if status == 'enrolled' %}
+    <div class="alert ok">Inscription approuvée par l'enseignant — vous avez accès aux ressources de la classe.</div>
+  {% elif status == 'pending' %}
+    <div class="alert info">
+      Demande envoyée le {{ applied_at | dt }}. En attente de la décision de l'enseignant.
+    </div>
+  {% elif status == 'rejected' %}
+    <div class="alert error">Votre demande a été refusée. Vous pouvez en soumettre une nouvelle.</div>
+  {% else %}
+    <div class="alert">Vous n'avez pas encore demandé à rejoindre cette classe.</div>
+  {% endif %}
+
+  <ol class="steps">
+    <li class="done">Compte créé et portefeuille blockchain attribué</li>
+    <li class="{% if status in ['pending', 'enrolled'] %}done{% elif status != 'rejected' %}now{% endif %}">Demande d'inscription signée et envoyée</li>
+    <li class="{% if status == 'enrolled' %}done{% elif status == 'pending' %}now{% endif %}">Approbation par l'enseignant</li>
+    <li class="{% if status == 'enrolled' %}done{% endif %}">Accès aux cours, TP, examens et à votre note</li>
+  </ol>
+
+  {% if status in ['none', 'rejected'] %}
+  <form method="post" action="/enrollment/request" class="mt-1">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">Demander mon inscription à la classe</button>
+  </form>
+  <p class="hint">Cette demande est une transaction signée par votre propre clé, puis validée par les 4 nœuds.</p>
+  {% endif %}
 </section>
+
+{% if enrolled %}
 <section class="card">
-  <h2>Documents</h2>
-  <table>
-    <tr><th>#</th><th>Type</th><th>Titre</th><th>Accès</th><th></th></tr>
-    {% for m in materials %}
-    <tr>
-      <td>{{ m.id }}</td><td>{{ m.kind }}</td><td>{{ m.title }}</td>
-      <td>{% if m.accessible %}ouvert{% else %}verrouillé (24 h){% endif %}</td>
-      <td>{% if m.accessible %}<a href="/material/{{ m.id }}/download">Télécharger</a>{% else %}—{% endif %}</td>
-    </tr>
-    {% endfor %}
-  </table>
+  <header>
+    <h2>Ma note</h2>
+    <p>Le contrat refuse de renvoyer la note d'un autre étudiant.</p>
+  </header>
+  {% if published %}
+    <div class="grade-value">{{ grade }}</div>
+  {% else %}
+    <p class="empty">Votre note n'a pas encore été publiée.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <header>
+    <h2>Documents de la classe</h2>
+    <p>{{ materials|length }} document(s) visible(s) pour vous.</p>
+  </header>
+  {% if materials %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Type</th><th>Titre</th><th>Disponibilité</th><th class="right"></th></tr></thead>
+      <tbody>
+        {% for m in materials %}
+        <tr>
+          <td><span class="badge kind">{{ m.kind }}</span></td>
+          <td>
+            <strong>{{ m.title }}</strong>
+            {% if m.has_prev %}<br><span class="muted small">nouvelle version du document #{{ m.prev_id }}</span>{% endif %}
+          </td>
+          <td>
+            {% if m.accessible %}<span class="badge ok">disponible</span>
+            {% else %}<span class="badge lock">déverrouillé le {{ m.unlocks_at | dt }}</span>{% endif %}
+          </td>
+          <td class="right">
+            {% if m.accessible %}<a class="btn btn-sm btn-ghost" href="/material/{{ m.id }}/download">Télécharger</a>
+            {% else %}<span class="muted">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="empty">Aucun document publié pour l'instant.</p>
+  {% endif %}
+  <p class="hint">Chaque téléchargement est revérifié : le SHA-256 du fichier doit correspondre à celui ancré sur la chaîne.</p>
 </section>
 {% endif %}
+
 {% endblock %}

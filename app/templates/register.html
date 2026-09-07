@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Créer un compte · Registre de classe{% endblock %}
+{% block content %}
+<div class="auth">
+  <div class="card">
+    <h1>Créer un compte étudiant</h1>
+    <p class="sub">Un portefeuille blockchain est généré pour vous : il signera votre demande d'inscription.</p>
+    {% if error %}<div class="alert error">{{ error }}</div>{% endif %}
+    <form method="post" action="/register">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>Identifiant <span class="opt">— 3 à 32 caractères, minuscules</span>
+        <input name="username" value="{{ username }}" autocomplete="username"
+               pattern="[a-z0-9][a-z0-9._\-]{2,31}" autofocus required>
+      </label>
+      <label>Mot de passe <span class="opt">— 12 caractères minimum</span>
+        <input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+      </label>
+      <label>Confirmation
+        <input name="confirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+      </label>
+      <button class="btn-block" type="submit">Créer mon compte</button>
+    </form>
+    <p class="switch">Déjà inscrit ? <a href="/login">Se connecter</a></p>
+  </div>
+  <p class="hint">
+    Votre identité reste hors chaîne : la blockchain ne voit qu'une adresse pseudonyme.
+    Créer un compte ne donne aucun accès tant que l'enseignant n'a pas approuvé la demande.
+  </p>
+</div>
+{% endblock %}

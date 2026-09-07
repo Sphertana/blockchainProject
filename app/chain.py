@@ -57,9 +57,13 @@ def teacher_account(w3: Web3):
     return w3.eth.account.from_key(os.environ["TEACHER_PRIVATE_KEY"])
 
 
-def send_as_teacher(w3: Web3, fn):
-    """Sign and send a contract call as the teacher on the zero-gas chain."""
-    acct = teacher_account(w3)
+def send_as(w3: Web3, fn, private_key: str):
+    """Sign and send a contract call on the zero-gas chain, as the key's owner.
+
+    Students sign their own enrollment request: the transaction that lands in a
+    block is theirs, not the gateway's.
+    """
+    acct = w3.eth.account.from_key(private_key)
     tx = fn.build_transaction(
         {
             "from": acct.address,
@@ -75,3 +79,7 @@ def send_as_teacher(w3: Web3, fn):
     if receipt.status != 1:
         raise RuntimeError(f"transaction reverted: {tx_hash.hex()}")
     return receipt
+
+
+def send_as_teacher(w3: Web3, fn):
+    return send_as(w3, fn, os.environ["TEACHER_PRIVATE_KEY"])

@@ -10,9 +10,18 @@ tmp="$(mktemp -d)"
 jarT="$tmp/teacher.txt"
 jarS="$tmp/student.txt"
 jarS2="$tmp/student2.txt"
+jarN="$tmp/newcomer.txt"
 
 pass() { printf "  ok: %s\n" "$1"; }
 fail() { printf "  FAIL: %s\n" "$1"; exit 1; }
+csrf_from_html() { sed -n 's/.*name="csrf_token" value="\([^"]*\)".*/\1/p' | head -1; }
+login() {
+  local jar="$1" username="$2" password="$3" token
+  token="$(curl -fsS -c "$jar" "$BASE/login" | csrf_from_html)"
+  curl -fsS -o /dev/null -b "$jar" -c "$jar" \
+    -d "username=$username" --data-urlencode "password=$password" \
+    --data-urlencode "csrf_token=$token" "$BASE/login"
+}
 
 echo "== chain =="
 $COMPOSE exec -T api python - <<'PY'
@@ -50,34 +59,84 @@ print("  enrolled:", c.functions.isEnrolled(addr).call())
 PY
 
 echo "== teacher logs in and publishes a lecture + a locked exam =="
-curl -s -o /dev/null -c "$jarT" -d 'username=teacher' --data-urlencode "password=$TEACHER_PASSWORD" "$BASE/login"
+login "$jarT" teacher "$TEACHER_PASSWORD"
+teacher_html="$(curl -fsS -b "$jarT" -c "$jarT" "$BASE/dashboard")"
+teacher_csrf="$(printf '%s' "$teacher_html" | csrf_from_html)"
+csrf_status="$(curl -s -o /dev/null -w '%{http_code}' -b "$jarT" \
+  -d "address=$STUDENT1&value=forged" "$BASE/grade")"
+[[ "$csrf_status" == "403" ]] || fail "teacher action accepted without CSRF token"
+pass "state-changing action rejects a missing CSRF token"
+
 echo "smoke lecture $(date)" > "$tmp/lecture.txt"
-curl -s -o /dev/null -b "$jarT" -F 'kind=0' -F 'title=Cours smoke' -F "file=@$tmp/lecture.txt" "$BASE/material"
+curl -fsS -o /dev/null -b "$jarT" -c "$jarT" -F "csrf_token=$teacher_csrf" \
+  -F 'kind=0' -F 'title=Cours smoke' -F "file=@$tmp/lecture.txt" "$BASE/material"
 now="$(date +%Y-%m-%dT%H:%M)"
-curl -s -o /dev/null -b "$jarT" -F 'kind=2' -F 'title=Examen smoke' -F "exam_at=$now" -F "file=@$tmp/lecture.txt" "$BASE/material"
+curl -fsS -o /dev/null -b "$jarT" -c "$jarT" -F "csrf_token=$teacher_csrf" \
+  -F 'kind=2' -F 'title=Examen smoke' -F "exam_at=$now" -F "file=@$tmp/lecture.txt" "$BASE/material"
 ids="$($COMPOSE exec -T api python -c "from app.chain import get_w3,get_contract;c=get_contract(get_w3());n=c.functions.materialCount().call();print(n-2,n-1)")"
 lecture_id="$(echo "$ids" | awk '{print $1}')"
 exam_id="$(echo "$ids" | awk '{print $2}')"
 pass "lecture id=$lecture_id, exam id=$exam_id"
 
 echo "== teacher publishes a grade for student1 =="
-curl -s -o /dev/null -b "$jarT" -d "address=$STUDENT1&value=A" "$BASE/grade"
+curl -fsS -o /dev/null -b "$jarT" -c "$jarT" \
+  -d "address=$STUDENT1&value=A" --data-urlencode "csrf_token=$teacher_csrf" "$BASE/grade"
+raw_grade="$($COMPOSE exec -T api python - <<PY | tr -d '\r'
+from web3 import Web3
+from app.chain import get_w3, get_contract, teacher_account
+w3 = get_w3(); c = get_contract(w3)
+print(c.functions.gradeOf(Web3.to_checksum_address("$STUDENT1")).call({"from": teacher_account(w3).address})[1])
+PY
+)"
+[[ "$raw_grade" == enc:v1:* && "$raw_grade" != "A" ]] \
+  || fail "grade is stored in plaintext on-chain"
+pass "grade is AES-256-GCM ciphertext in raw chain storage"
 
 echo "== student1 dashboard reflects the rules =="
-curl -s -o /dev/null -c "$jarS" -d 'username=student1' --data-urlencode "password=$STUDENT1_PASSWORD" "$BASE/login"
+login "$jarS" student1 "$STUDENT1_PASSWORD"
 html="$(curl -s -b "$jarS" "$BASE/dashboard")"
 echo "$html" | grep -q "Cours smoke" || fail "student cannot see the lecture"
 pass "lecture visible to enrolled student"
 echo "$html" | grep -q "verrouillé" || fail "exam is not shown as locked"
 pass "exam locked for 24h"
-echo "$html" | grep -q "<strong>A</strong>" || fail "student cannot see own grade"
+echo "$html" | grep -q 'grade-value">A<' || fail "student cannot see own grade"
 pass "student sees own grade"
 
 echo "== student2 cannot see student1's grade =="
-curl -s -o /dev/null -c "$jarS2" -d 'username=student2' --data-urlencode "password=$STUDENT2_PASSWORD" "$BASE/login"
+login "$jarS2" student2 "$STUDENT2_PASSWORD"
 html2="$(curl -s -b "$jarS2" "$BASE/dashboard")"
-echo "$html2" | grep -q "<strong>A</strong>" && fail "student2 can see student1's grade"
+echo "$html2" | grep -q 'grade-value">A<' && fail "student2 can see student1's grade"
 pass "student2 cannot see student1's grade"
+
+echo "== sign-up, self-service request, teacher approval =="
+NEW="smoke$(date +%s)"
+register_csrf="$(curl -fsS -c "$jarN" "$BASE/register" | csrf_from_html)"
+curl -fsS -o /dev/null -b "$jarN" -c "$jarN" -d "username=$NEW" \
+  --data-urlencode 'password=smoke-passw0rd' --data-urlencode 'confirm=smoke-passw0rd' \
+  --data-urlencode "csrf_token=$register_csrf" "$BASE/register"
+new_html="$(curl -fsS -b "$jarN" -c "$jarN" "$BASE/dashboard")"
+new_csrf="$(printf '%s' "$new_html" | csrf_from_html)"
+printf '%s' "$new_html" | grep -q "pas encore demand" || fail "new account is not in the 'no request' state"
+pass "account created with its own wallet, no access yet"
+
+curl -s -b "$jarN" "$BASE/material/$lecture_id/download" | grep -qi "refus" || fail "non-enrolled user could download a lecture"
+pass "non-enrolled user refused by the contract"
+
+curl -fsS -o /dev/null -b "$jarN" -c "$jarN" \
+  --data-urlencode "csrf_token=$new_csrf" "$BASE/enrollment/request"
+curl -s -b "$jarN" "$BASE/dashboard" | grep -q "En attente de la décision" || fail "request not registered on-chain"
+pass "enrollment request signed by the student and mined"
+
+NEW_ADDR="$($COMPOSE exec -T api python -c \
+  "import sqlite3;print(sqlite3.connect('data/app.db').execute('select address from users where username=?',('$NEW',)).fetchone()[0])" | tr -d '\r')"
+curl -s -b "$jarT" "$BASE/dashboard" | grep -q "$NEW" || fail "request not visible in the teacher queue"
+pass "request queued for the teacher"
+
+curl -fsS -o /dev/null -b "$jarT" -c "$jarT" \
+  -d "address=$NEW_ADDR&action=approve" --data-urlencode "csrf_token=$teacher_csrf" \
+  "$BASE/enrollment/decide"
+curl -s -b "$jarN" "$BASE/dashboard" | grep -q "Cours smoke" || fail "approved student still has no access"
+pass "teacher approval unlocks the class materials"
 
 echo "== hash-verified download of the lecture =="
 curl -s -b "$jarS" "$BASE/material/$lecture_id/download" -o "$tmp/dl.txt"
