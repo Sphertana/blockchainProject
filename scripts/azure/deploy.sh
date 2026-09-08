@@ -22,6 +22,7 @@ az network nsg rule create -g "$RG" --nsg-name "${nsg_id##*/}" -n https-demo \
 rsync -az --delete \
   --exclude '.git' --exclude '.venv' --exclude '.env' --exclude '.github/skills' \
   --exclude 'EXPLICATIONS_PERSO.md' --exclude 'scripts/azure/.demo_credentials' \
+  --exclude 'EXPLICATIONS_PERSO.pdf' \
   --exclude 'scripts/azure/.vm_ip' --exclude 'scripts/azure/.vm_host' \
   --exclude 'data' \
   --exclude 'network/data' --exclude 'network/networkFiles' \

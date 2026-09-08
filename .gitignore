@@ -28,6 +28,7 @@ network/networkFiles/
 
 # Personal explanation notes (how the project was built / Azure setup) — not for the public repo
 EXPLICATIONS_PERSO.md
+EXPLICATIONS_PERSO.pdf
 
 # Local Azure deployment state
 scripts/azure/.vm_ip
