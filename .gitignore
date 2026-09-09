@@ -1,14 +1,28 @@
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 .venv/
 venv/
 *.egg-info/
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+/build/
+/dist/
 
 # Secrets / local env
 .env
+.env.*
+!.env.example
 *.pem
+*.key
+.azure/
 
 # Local runtime data (SQLite DB, uploaded course files)
 data/
@@ -22,13 +36,28 @@ network/networkFiles/
 
 # OS
 .DS_Store
+._*
+Thumbs.db
+
+# Local editor settings, logs and temporary files
+.vscode/
+.idea/
+*.log
+*.tmp
+*.swp
+*.swo
+*~
 
 # Local project skill: guides local work, intentionally not part of the public repo
 .github/skills/
 
-# Personal explanation notes (how the project was built / Azure setup) — not for the public repo
-EXPLICATIONS_PERSO.md
-EXPLICATIONS_PERSO.pdf
+# Markdown sources stay local; only the root README is versioned
+*.[mM][dD]
+!/README.md
+
+# Generated PDFs stay local; only the final technical report is versioned
+*.[pP][dD][fF]
+!/docs/report/rapport-technique.pdf
 
 # Local Azure deployment state
 scripts/azure/.vm_ip
