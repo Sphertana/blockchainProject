@@ -5,6 +5,14 @@ Registre de classe sur une blockchain privée **Hyperledger Besu**.
 Le projet permet à un enseignant de publier des cours, TP, examens, corrections
 et notes, avec des règles d'accès appliquées directement par un smart contract.
 
+**Auteur :** Cheikhna Ibrahim DIAGANA
+
+**Numéro étudiant :** 63215
+
+**Établissement :** ISEP
+
+**Promotion :** 2023-2026
+
 **Version : contrat V4.** Documentation revue le 9 septembre 2026 ; dernière
 campagne complète locale et Azure réussie le 9 septembre 2026.
 
@@ -225,8 +233,8 @@ Cette commande désalloue la VM et arrête la facturation du compute. Le disque 
 l'IP publique restent conservés et facturables. Le tarif de calcul observé est
 de 0,0944 USD/h pour B2ms Linux en France Central, hors disque/IP. Le budget de
 10 EUR/mois avec alerte à 80 % ne bloque pas les dépenses ; l'arrêt automatique
-est configuré à 23 h UTC. La couverture par des crédits doit être vérifiée dans
-l'abonnement, pas supposée.
+est configuré à 23 h UTC. L'hébergement utilise un abonnement Azure personnel :
+les dépenses sont à la charge de l'auteur, sans crédits étudiants.
 
 Suppression définitive de toutes les ressources :
 
